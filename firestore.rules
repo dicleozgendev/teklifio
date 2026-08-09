@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasWorkspace() {
+      return signedIn() && exists(userPath());
+    }
+
+    function organizationId() {
+      return get(userPath()).data.organizationId;
+    }
+
+    function ownsExistingDocument() {
+      return hasWorkspace() && resource.data.organizationId == organizationId();
+    }
+
+    function writesOwnOrganization() {
+      return hasWorkspace() && request.resource.data.organizationId == organizationId();
+    }
+
+    match /organizations/{orgId} {
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid;
+      allow read: if hasWorkspace() && orgId == organizationId();
+      allow update: if hasWorkspace()
+        && orgId == organizationId()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if hasWorkspace()
+        && orgId == organizationId()
+        && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid;
+      allow read: if signedIn() && userId == request.auth.uid;
+      allow update: if signedIn()
+        && userId == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    match /customers/{documentId} {
+      allow read, delete: if ownsExistingDocument();
+      allow create: if writesOwnOrganization();
+      allow update: if ownsExistingDocument() && writesOwnOrganization();
+    }
+
+    match /products/{documentId} {
+      allow read, delete: if ownsExistingDocument();
+      allow create: if writesOwnOrganization();
+      allow update: if ownsExistingDocument() && writesOwnOrganization();
+    }
+
+    match /quotes/{documentId} {
+      allow read, delete: if ownsExistingDocument();
+      allow create: if writesOwnOrganization();
+      allow update: if ownsExistingDocument() && writesOwnOrganization();
+    }
+
+    match /quoteItems/{documentId} {
+      allow read, delete: if ownsExistingDocument();
+      allow create: if writesOwnOrganization();
+      allow update: if ownsExistingDocument() && writesOwnOrganization();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

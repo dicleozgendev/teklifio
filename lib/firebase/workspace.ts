@@ -1,0 +1,127 @@
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+import { getFirebaseServices } from "./client";
+
+export type WorkspaceCustomer = { id: number; name: string; company: string; email: string; phone: string; address?: string; taxOffice?: string; taxNumber?: string; notes?: string; initials: string; color: string };
+export type WorkspaceProduct = { id: number; name: string; code: string; type: "Ürün" | "Hizmet"; price: number; vat: number; unit: string; description?: string };
+export type WorkspaceQuoteItem = { id: number; productId: number; name: string; qty: number; price: number; discount: number; vat: number };
+export type WorkspaceQuote = { id: string; customerId: number; date: string; validUntil: string; status: "Taslak" | "Gönderildi" | "Onaylandı"; items: WorkspaceQuoteItem[]; note: string; currency?: string };
+export type WorkspaceSettings = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; validityDays: number; quotePrefix: string; currency: string; defaultNote: string; footerText: string; vatRates: number[]; defaultVat: number };
+
+async function getOrganizationId() {
+  const services = getFirebaseServices();
+  const user = services?.auth.currentUser;
+  if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
+  const userRef = doc(services.db, "users", user.uid);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const snapshot = await getDoc(userRef);
+    if (snapshot.exists()) return snapshot.data().organizationId as string;
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+  throw new Error("Kullanıcı çalışma alanı bulunamadı.");
+}
+
+export async function loadWorkspaceData() {
+  const services = getFirebaseServices();
+  if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const own = (name: string) =>
+    getDocs(query(collection(services.db, name), where("organizationId", "==", organizationId)));
+  const [customerDocs, productDocs, quoteDocs, itemDocs] = await Promise.all([
+    own("customers"), own("products"), own("quotes"), own("quoteItems"),
+  ]);
+
+  const customers = customerDocs.docs.map((entry) => entry.data() as WorkspaceCustomer);
+  const products = productDocs.docs.map((entry) => entry.data() as WorkspaceProduct);
+  const allItems = itemDocs.docs.map((entry) => entry.data() as WorkspaceQuoteItem & { quoteId: string });
+  const quotes = quoteDocs.docs.map((entry) => {
+    const data = entry.data() as Omit<WorkspaceQuote, "items">;
+    return { ...data, items: allItems.filter((item) => item.quoteId === data.id) };
+  });
+  quotes.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const organization = await getDoc(doc(services.db, "organizations", organizationId));
+  return { customers, products, quotes, settings: organization.data()?.settings as WorkspaceSettings | undefined };
+}
+
+export async function saveCustomer(customer: WorkspaceCustomer) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  await setDoc(doc(services.db, "customers", `${organizationId}_${customer.id}`), {
+    ...customer, organizationId, updatedAt: serverTimestamp(),
+  });
+}
+
+export async function saveProduct(product: WorkspaceProduct) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  await setDoc(doc(services.db, "products", `${organizationId}_${product.id}`), {
+    ...product, organizationId, updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteCustomer(customerId: number) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  await deleteDoc(doc(services.db, "customers", `${organizationId}_${customerId}`));
+}
+
+export async function deleteProduct(productId: number) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  await deleteDoc(doc(services.db, "products", `${organizationId}_${productId}`));
+}
+
+export async function saveWorkspaceSettings(settings: WorkspaceSettings) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  await setDoc(doc(services.db, "organizations", organizationId), { settings, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function saveQuote(quote: WorkspaceQuote) {
+  const services = getFirebaseServices();
+  if (!services) return;
+  const organizationId = await getOrganizationId();
+  const batch = writeBatch(services.db);
+  const quoteDocumentId = `${organizationId}_${quote.id}`;
+  batch.set(doc(services.db, "quotes", quoteDocumentId), {
+    id: quote.id,
+    organizationId,
+    customerId: quote.customerId,
+    date: quote.date,
+    validUntil: quote.validUntil,
+    status: quote.status,
+    note: quote.note,
+    currency: quote.currency || "TRY",
+    updatedAt: serverTimestamp(),
+  });
+  quote.items.forEach((item, index) => {
+    batch.set(doc(services.db, "quoteItems", `${organizationId}_${quote.id}_${index + 1}`), {
+      ...item,
+      id: index + 1,
+      quoteId: quote.id,
+      organizationId,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  try {
+    await batch.commit();
+  } catch (error) {
+    await deleteDoc(doc(services.db, "quotes", quoteDocumentId)).catch(() => undefined);
+    throw error;
+  }
+}
