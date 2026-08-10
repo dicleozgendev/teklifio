@@ -2718,3 +2718,34 @@ textarea {
   .help-panel ul { grid-template-columns: 1fr; }
   .pricing-notice { align-items: flex-start; flex-direction: column; }
 }
+
+/* WCAG AA contrast refinements for compact dashboard and public-page labels. */
+.sidebar .nav-label { color: #aaa6bd; }
+.top-search kbd { color: #5f5b6b; }
+.page-head p,
+.builder-head p,
+.panel-head p,
+.quick-row > div > p { color: #6b6779; }
+.eyebrow { color: #625d70; }
+.trend { color: #08724e; }
+.metric small,
+.quick-row > button small { color: #686475; }
+.y-labels,
+.bar-col small { color: #696574; }
+.target-panel > strong span { color: #696574; }
+.target-panel > p { color: #696574; }
+.target-note { color: #096b49; }
+th { color: #696574; }
+.mini-customer span small { color: #696574; }
+.amber { color: #8b4a00; }
+.rose { color: #a32e45; }
+.emerald { color: #086b49; }
+.status.onaylandi { color: #086b49; }
+.status.gonderildi { color: #245f9d; }
+.status.taslak { color: #5f5a67; }
+.app-footer,
+.app-footer a,
+.auth-public-links a { color: #676271; }
+.guide-card small,
+.pricing-card small { color: #5849c7; }
+.legal-document > footer { color: #676271; }
