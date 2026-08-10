@@ -52,7 +52,7 @@ test("onboarding checklist and in-app support actions are functional", async ({ 
   await expect(support).toBeVisible();
   await support.getByRole("button", { name: /Müşteri ekleyin/ }).click();
   await expect(page.getByRole("heading", { name: "Yeni müşteri" })).toBeVisible();
-  await page.getByRole("button", { name: "Kapat" }).click();
+  await page.getByRole("button", { name: "Pencereyi kapat" }).click();
 
   await openNavigation();
   await page.getByRole("button", { name: "Yardım ve destek" }).click();

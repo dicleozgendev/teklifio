@@ -2554,7 +2554,7 @@ function Modal({
             <span className="eyebrow">YENİ KAYIT</span>
             <h2>{title}</h2>
           </div>
-          <button onClick={onClose}>
+          <button onClick={onClose} aria-label="Pencereyi kapat">
             <X />
           </button>
         </div>
