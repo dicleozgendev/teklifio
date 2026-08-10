@@ -10,6 +10,14 @@ export function canManageWorkspace(role: WorkspaceRole) {
   return role === "owner" || role === "admin";
 }
 
+export function canEditWorkspaceData(role: WorkspaceRole) {
+  return role !== "viewer";
+}
+
+export function canRequestOrganizationDeletion(role: WorkspaceRole) {
+  return role === "owner";
+}
+
 export function authErrorMessage(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error
     ? String((error as { code?: unknown }).code ?? "")

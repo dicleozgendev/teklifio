@@ -125,6 +125,16 @@ export async function cancelWorkspaceInvitation(id: string) {
   await getOrganizationId(); await updateDoc(doc(services.db, "invitations", id), { status: "cancelled", updatedAt: serverTimestamp() });
 }
 
+export async function requestOrganizationDeletion(confirmation: string) {
+  const services = getFirebaseServices(); const user = services?.auth.currentUser;
+  if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
+  const organizationId = await getOrganizationId();
+  await setDoc(doc(services.db, "deletionRequests", organizationId), {
+    organizationId, requestedBy: user.uid, confirmation,
+    status: "pending", requestedAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  });
+}
+
 export async function completeWorkspaceOnboarding() {
   const services = getFirebaseServices();
   if (!services) throw new Error("Firebase yapılandırılmadı.");

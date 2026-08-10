@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   authErrorMessage,
+  canEditWorkspaceData,
   canManageWorkspace,
+  canRequestOrganizationDeletion,
   normalizeWorkspaceRole,
 } from "../lib/auth-utils.ts";
 
@@ -18,6 +20,15 @@ test("only owner and admin roles can manage a workspace", () => {
   assert.equal(canManageWorkspace("admin"), true);
   assert.equal(canManageWorkspace("member"), false);
   assert.equal(canManageWorkspace("viewer"), false);
+});
+
+test("workspace permissions distinguish editing and deletion requests", () => {
+  assert.equal(canEditWorkspaceData("owner"), true);
+  assert.equal(canEditWorkspaceData("admin"), true);
+  assert.equal(canEditWorkspaceData("member"), true);
+  assert.equal(canEditWorkspaceData("viewer"), false);
+  assert.equal(canRequestOrganizationDeletion("owner"), true);
+  assert.equal(canRequestOrganizationDeletion("admin"), false);
 });
 
 test("maps authentication errors without exposing provider details", () => {

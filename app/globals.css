@@ -2437,6 +2437,12 @@ textarea {
 .onboarding-actions button { min-width: 120px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .onboarding-actions svg { width: 15px; }
 .account-settings { display: grid; gap: 15px; }
+.deletion-request { display: grid; gap: 12px; border: 1px solid #f0caca; border-radius: 12px; padding: 16px; background: #fffafa; }
+.deletion-request > div { display: grid; gap: 4px; }
+.deletion-request small { color: var(--muted); line-height: 1.5; }
+.deletion-request label { display: grid; gap: 7px; font-size: 13px; font-weight: 650; }
+.danger-button { justify-self: start; border: 1px solid #dc3f3f; border-radius: 9px; padding: 10px 14px; color: #b42323; background: white; font-weight: 700; cursor: pointer; }
+.danger-button:disabled { cursor: not-allowed; opacity: .45; }
 .team-settings { display: grid; gap: 18px; }
 .team-invite { display: grid; grid-template-columns: minmax(220px, 1fr) 180px auto; gap: 12px; align-items: end; }
 .team-invite label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 650; }

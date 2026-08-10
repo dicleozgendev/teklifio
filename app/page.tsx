@@ -34,6 +34,7 @@ import {
   saveQuote,
   saveWorkspaceSettings,
   revokeQuoteShare,
+  requestOrganizationDeletion,
   type QuoteShare,
   type QuoteVersion,
   updateWorkspaceMember,
@@ -43,7 +44,7 @@ import {
   type WorkspaceSettings,
 } from "@/lib/firebase/workspace";
 import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
-import { authErrorMessage, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
+import { authErrorMessage, canEditWorkspaceData, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
 import {
   ArrowLeft,
   ArrowRight,
@@ -578,6 +579,15 @@ export default function Home() {
     .join("")
     .slice(0, 2)
     .toLocaleUpperCase("tr-TR") || "DÖ";
+  const mayEdit = !workspaceProfile || canEditWorkspaceData(workspaceProfile.role);
+  const mayManage = !workspaceProfile || canManageWorkspace(workspaceProfile.role);
+  const exportWorkspace = () => {
+    const payload = { exportedAt: new Date().toISOString(), organization: organizationName, settings, customers, products, quotes };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const anchor = document.createElement("a");
+    anchor.href = url; anchor.download = `teklifio-${organizationName.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]+/g, "-") || "workspace"}-veri.json`;
+    anchor.click(); URL.revokeObjectURL(url);
+  };
 
   const go = (next: Screen) => {
     setScreen(next);
@@ -625,7 +635,7 @@ export default function Home() {
         </div>
         <nav>
           <p className="nav-label">ÇALIŞMA ALANI</p>
-          {nav.map((item) => (
+          {nav.filter((item) => mayEdit || item.id !== "new-quote").map((item) => (
             <button
               key={item.id}
               className={
@@ -651,7 +661,7 @@ export default function Home() {
             <span>Ayarlar</span>
           </button>
         </nav>
-        <div className="sidebar-help">
+        {mayEdit && <div className="sidebar-help">
           <div className="help-icon">
             <Sparkles size={17} />
           </div>
@@ -662,7 +672,7 @@ export default function Home() {
           <button onClick={() => go("new-quote")}>
             Teklif oluştur <ArrowRight size={14} />
           </button>
-        </div>
+        </div>}
         <div className="profile">
           <div className="avatar avatar-dark">{displayInitials}</div>
           <div>
@@ -714,7 +724,7 @@ export default function Home() {
             )}
           </div>
           <div className="top-actions">
-            <button className="top-new-quote" onClick={() => go("new-quote")}><Plus size={16} /><span>Yeni teklif</span></button>
+            {mayEdit && <button className="top-new-quote" onClick={() => go("new-quote")}><Plus size={16} /><span>Yeni teklif</span></button>}
             <button
               className="notification"
               aria-label="Bildirimleri aç"
@@ -769,13 +779,14 @@ export default function Home() {
               onQuotes={() => go("quotes")}
               onCustomer={() => { setQuickCreate("customer"); setQuickCreateKey((key) => key + 1); go("customers"); }}
               onProduct={() => { setQuickCreate("product"); setQuickCreateKey((key) => key + 1); go("products"); }}
+              editable={mayEdit}
             />
           )}
           {screen === "customers" && (
-            <Customers key={`customer-${focusedCustomerId || 0}-${searchDestinationKey}-${quickCreateKey}`} customers={customers} quotes={quotes} setCustomers={updateCustomers} focusedId={focusedCustomerId} onClearFocus={() => setFocusedCustomerId(undefined)} initiallyOpen={quickCreate === "customer"} onQuickCreateDone={() => setQuickCreate(null)} />
+            <Customers key={`customer-${focusedCustomerId || 0}-${searchDestinationKey}-${quickCreateKey}`} customers={customers} quotes={quotes} setCustomers={updateCustomers} focusedId={focusedCustomerId} onClearFocus={() => setFocusedCustomerId(undefined)} initiallyOpen={mayEdit && quickCreate === "customer"} onQuickCreateDone={() => setQuickCreate(null)} editable={mayEdit} />
           )}
           {screen === "products" && (
-            <Products key={`product-${focusedProductId || 0}-${searchDestinationKey}-${quickCreateKey}`} products={products} settings={settings} setProducts={updateProducts} focusedId={focusedProductId} onClearFocus={() => setFocusedProductId(undefined)} initiallyOpen={quickCreate === "product"} onQuickCreateDone={() => setQuickCreate(null)} />
+            <Products key={`product-${focusedProductId || 0}-${searchDestinationKey}-${quickCreateKey}`} products={products} settings={settings} setProducts={updateProducts} focusedId={focusedProductId} onClearFocus={() => setFocusedProductId(undefined)} initiallyOpen={mayEdit && quickCreate === "product"} onQuickCreateDone={() => setQuickCreate(null)} editable={mayEdit} />
           )}
           {screen === "quotes" && (
             <Quotes
@@ -783,9 +794,10 @@ export default function Home() {
               customers={customers}
               onNew={() => go("new-quote")}
               onOpen={openQuote}
+              editable={mayEdit}
             />
           )}
-          {screen === "new-quote" && (
+          {screen === "new-quote" && mayEdit && (
             <NewQuote
               customers={customers}
               products={products}
@@ -809,10 +821,11 @@ export default function Home() {
                     .customerId,
               )!}
               settings={settings}
+              editable={mayEdit}
               onBack={() => go("quotes")}
             />
           )}
-          {screen === "settings" && <SettingsPage settings={settings} organizationName={organizationName} onSave={updateSettings} currentUser={currentUser} profile={workspaceProfile} onAccountNameChange={async (fullName) => { await updateAccountName(fullName); setWorkspaceProfile((current) => current ? { ...current, fullName } : current); }} />}
+          {screen === "settings" && <SettingsPage settings={settings} organizationName={organizationName} onSave={updateSettings} currentUser={currentUser} profile={workspaceProfile} canManage={mayManage} onExport={exportWorkspace} onAccountNameChange={async (fullName) => { await updateAccountName(fullName); setWorkspaceProfile((current) => current ? { ...current, fullName } : current); }} />}
         </div>
         {searchRecord?.kind === "customer" && <Modal title={searchRecord.record.company} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Yetkili:</b> {searchRecord.record.name || "Belirtilmedi"}</p><p><b>E-posta:</b> {searchRecord.record.email || "Belirtilmedi"}</p><p><b>Telefon:</b> {searchRecord.record.phone || "Belirtilmedi"}</p><p><b>Adres:</b> {searchRecord.record.address || "Belirtilmedi"}</p><p><b>Vergi:</b> {[searchRecord.record.taxOffice, searchRecord.record.taxNumber].filter(Boolean).join(" · ") || "Belirtilmedi"}</p><p><b>Not:</b> {searchRecord.record.notes || "Belirtilmedi"}</p></div></Modal>}
         {searchRecord?.kind === "product" && <Modal title={searchRecord.record.name} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Kod:</b> {searchRecord.record.code || "Belirtilmedi"}</p><p><b>Tür:</b> {searchRecord.record.type}</p><p><b>Birim:</b> {searchRecord.record.unit}</p><p><b>Birim fiyat:</b> {currency(searchRecord.record.price)}</p><p><b>Varsayılan KDV:</b> %{searchRecord.record.vat}</p><p><b>Açıklama:</b> {searchRecord.record.description || "Belirtilmedi"}</p></div></Modal>}
@@ -860,6 +873,7 @@ function Dashboard({
   onQuotes,
   onCustomer,
   onProduct,
+  editable,
 }: {
   customers: Customer[];
   quotes: Quote[];
@@ -868,6 +882,7 @@ function Dashboard({
   onQuotes: () => void;
   onCustomer: () => void;
   onProduct: () => void;
+  editable: boolean;
 }) {
   const approved = quotes
     .filter((q) => q.status === "Onaylandı")
@@ -878,11 +893,11 @@ function Dashboard({
         eyebrow="8 AĞUSTOS 2026, CUMARTESİ"
         title="Günaydın, Dicle 👋"
         copy="İşlerin iyi görünüyor. Bugünkü teklif performansına göz at."
-        action={
+        action={editable ?
           <button className="primary" onClick={onNew}>
             <Plus size={18} /> Yeni teklif
           </button>
-        }
+        : undefined}
       />
       <section className="metrics">
         <Metric
@@ -1000,7 +1015,7 @@ function Dashboard({
           onOpen={onQuote}
         />
       </section>
-      <section className="quick-row">
+      {editable && <section className="quick-row">
         <div>
           <h3>Hızlı işlemler</h3>
           <p>Sık kullandığın işlemlere kolayca ulaş.</p>
@@ -1035,7 +1050,7 @@ function Dashboard({
           </div>
           <ArrowRight />
         </button>
-      </section>
+      </section>}
     </>
   );
 }
@@ -1079,6 +1094,7 @@ function Customers({
   onClearFocus,
   initiallyOpen,
   onQuickCreateDone,
+  editable,
 }: {
   customers: Customer[];
   quotes: Quote[];
@@ -1087,6 +1103,7 @@ function Customers({
   onClearFocus: () => void;
   initiallyOpen?: boolean;
   onQuickCreateDone: () => void;
+  editable: boolean;
 }) {
   const [editing, setEditing] = useState<Customer | "new" | null>(initiallyOpen ? "new" : null);
   const [detail, setDetail] = useState<Customer | null>(null);
@@ -1122,11 +1139,11 @@ function Customers({
       <PageHead
         title="Müşteriler"
         copy={`${customers.length} müşteri kaydı · İlişkilerini tek yerden yönet.`}
-        action={
+        action={editable ?
           <button className="primary" onClick={() => { setForm({ company: "", name: "", email: "", phone: "", address: "", taxOffice: "", taxNumber: "", notes: "" }); setEditing("new"); }}>
             <Plus size={18} /> Müşteri ekle
           </button>
-        }
+        : undefined}
       />
       <div className="toolbar">
         <div className="search-box">
@@ -1145,8 +1162,8 @@ function Customers({
               <div className={`company-logo ${c.color}`}>{c.initials}</div>
               <div className="record-actions">
                 <button onClick={() => setDetail(c)}>Detay</button>
-                <button aria-label={`${c.company} müşterisini düzenle`} onClick={(event) => { event.stopPropagation(); setForm({ company: c.company, name: c.name, email: c.email, phone: c.phone, address: c.address || "", taxOffice: c.taxOffice || "", taxNumber: c.taxNumber || "", notes: c.notes || "" }); setEditing(c); }}>Düzenle</button>
-                <button className="danger-link" aria-label={`${c.company} müşterisini sil`} onClick={(event) => { event.stopPropagation(); if (quotes.some((quote) => quote.customerId === c.id)) { window.alert("Teklifi bulunan müşteri silinemez."); return; } if (window.confirm(`${c.company} silinsin mi?`)) setCustomers(customers.filter((item) => item.id !== c.id), c.id); }}>Sil</button>
+                {editable && <><button aria-label={`${c.company} müşterisini düzenle`} onClick={(event) => { event.stopPropagation(); setForm({ company: c.company, name: c.name, email: c.email, phone: c.phone, address: c.address || "", taxOffice: c.taxOffice || "", taxNumber: c.taxNumber || "", notes: c.notes || "" }); setEditing(c); }}>Düzenle</button>
+                <button className="danger-link" aria-label={`${c.company} müşterisini sil`} onClick={(event) => { event.stopPropagation(); if (quotes.some((quote) => quote.customerId === c.id)) { window.alert("Teklifi bulunan müşteri silinemez."); return; } if (window.confirm(`${c.company} silinsin mi?`)) setCustomers(customers.filter((item) => item.id !== c.id), c.id); }}>Sil</button></>}
               </div>
             </div>
             <h3>{c.company}</h3>
@@ -1226,6 +1243,7 @@ function Products({
   onClearFocus,
   initiallyOpen,
   onQuickCreateDone,
+  editable,
 }: {
   products: Product[];
   settings: WorkspaceSettings;
@@ -1234,6 +1252,7 @@ function Products({
   onClearFocus: () => void;
   initiallyOpen?: boolean;
   onQuickCreateDone: () => void;
+  editable: boolean;
 }) {
   const [editing, setEditing] = useState<Product | "new" | null>(initiallyOpen ? "new" : null);
   const [detail, setDetail] = useState<Product | null>(null);
@@ -1261,11 +1280,11 @@ function Products({
       <PageHead
         title="Ürün & Hizmetler"
         copy="Tekliflerinde kullandığın ürün ve hizmet kataloğu."
-        action={
+        action={editable ?
           <button className="primary" onClick={() => { setForm({ name: "", code: "", type: "Hizmet", price: 0, vat: 20, unit: "Adet", description: "" }); setEditing("new"); }}>
             <Plus size={18} /> Ürün veya hizmet ekle
           </button>
-        }
+        : undefined}
       />
       <div className="toolbar">
         <div className="search-box">
@@ -1318,7 +1337,7 @@ function Products({
                   </td>
                   <td>%{p.vat}</td>
                   <td>
-                    <div className="record-actions"><button onClick={() => { setForm({ name: p.name, code: p.code, type: p.type, price: p.price, vat: p.vat, unit: p.unit, description: p.description || "" }); setEditing(p); }}>Düzenle</button><button className="danger-link" onClick={() => { if (window.confirm(`${p.name} silinsin mi?`)) setProducts(products.filter((item) => item.id !== p.id), p.id); }}>Sil</button></div>
+                    {editable && <div className="record-actions"><button onClick={() => { setForm({ name: p.name, code: p.code, type: p.type, price: p.price, vat: p.vat, unit: p.unit, description: p.description || "" }); setEditing(p); }}>Düzenle</button><button className="danger-link" onClick={() => { if (window.confirm(`${p.name} silinsin mi?`)) setProducts(products.filter((item) => item.id !== p.id), p.id); }}>Sil</button></div>}
                   </td>
                 </tr>
               ))}
@@ -1407,11 +1426,13 @@ function Quotes({
   customers,
   onNew,
   onOpen,
+  editable,
 }: {
   quotes: Quote[];
   customers: Customer[];
   onNew: () => void;
   onOpen: (id: string) => void;
+  editable: boolean;
 }) {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "Gönderildi" | "Onaylandı">("all");
@@ -1427,11 +1448,11 @@ function Quotes({
       <PageHead
         title="Teklifler"
         copy="Tüm tekliflerini takip et, durumlarını yönet."
-        action={
+        action={editable ?
           <button className="primary" onClick={onNew}>
             <Plus size={18} /> Yeni teklif
           </button>
-        }
+        : undefined}
       />
       <div className="summary-chips">
         <button
@@ -2061,11 +2082,13 @@ function QuoteDetail({
   customer,
   settings,
   onBack,
+  editable,
 }: {
   quote: Quote;
   customer: Customer;
   settings: WorkspaceSettings;
   onBack: () => void;
+  editable: boolean;
 }) {
   const totals = quoteTotals(quote.items);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -2108,7 +2131,7 @@ function QuoteDetail({
           </div>
         </div>
         <div className="detail-actions">
-          {isFirebaseConfigured && <button className="secondary" onClick={shareQuote} disabled={shareBusy}><Share2 /> {shareBusy ? "Hazırlanıyor..." : "Paylaşım bağlantısı"}</button>}
+          {isFirebaseConfigured && editable && <button className="secondary" onClick={shareQuote} disabled={shareBusy}><Share2 /> {shareBusy ? "Hazırlanıyor..." : "Paylaşım bağlantısı"}</button>}
           <button
             className="secondary"
             onClick={downloadPdf}
@@ -2264,7 +2287,7 @@ function QuoteDetail({
             </div>
           </div>
           <hr />
-          {isFirebaseConfigured && <div className="quote-access-panel"><h4>Paylaşım ve sürümler</h4><p>{versions.length || 1} kayıtlı sürüm · {shares.filter((share) => share.active).length} aktif bağlantı</p>{shares.filter((share) => share.active).map((share) => <button type="button" className="danger-link" key={share.token} onClick={async () => { await revokeQuoteShare(share.token); setShares((current) => current.map((item) => item.token === share.token ? { ...item, active: false } : item)); }}>Bağlantıyı iptal et · {share.expiresAt.toDate().toLocaleDateString("tr-TR")}</button>)}<small>Her kayıt işlemi değiştirilemez bir teklif sürümü oluşturur. Paylaşım bağlantıları 30 gün sonra kapanır.</small></div>}
+          {isFirebaseConfigured && <div className="quote-access-panel"><h4>Paylaşım ve sürümler</h4><p>{versions.length || 1} kayıtlı sürüm · {shares.filter((share) => share.active).length} aktif bağlantı</p>{editable && shares.filter((share) => share.active).map((share) => <button type="button" className="danger-link" key={share.token} onClick={async () => { await revokeQuoteShare(share.token); setShares((current) => current.map((item) => item.token === share.token ? { ...item, active: false } : item)); }}>Bağlantıyı iptal et · {share.expiresAt.toDate().toLocaleDateString("tr-TR")}</button>)}<small>Her kayıt işlemi değiştirilemez bir teklif sürümü oluşturur. Paylaşım bağlantıları 30 gün sonra kapanır.</small></div>}
           <hr />
           <div className="meta-row">
             <CalendarDays />
@@ -2285,8 +2308,8 @@ function QuoteDetail({
   );
 }
 
-function SettingsPage({ settings, organizationName, onSave, currentUser, profile, onAccountNameChange }: { settings: WorkspaceSettings; organizationName: string; onSave: (settings: WorkspaceSettings) => Promise<void>; currentUser: User | null; profile: WorkspaceProfile | null; onAccountNameChange: (fullName: string) => Promise<void> }) {
-  const [section, setSection] = useState<"company" | "quote" | "tax" | "team" | "account">("company");
+function SettingsPage({ settings, organizationName, onSave, currentUser, profile, canManage, onExport, onAccountNameChange }: { settings: WorkspaceSettings; organizationName: string; onSave: (settings: WorkspaceSettings) => Promise<void>; currentUser: User | null; profile: WorkspaceProfile | null; canManage: boolean; onExport: () => void; onAccountNameChange: (fullName: string) => Promise<void> }) {
+  const [section, setSection] = useState<"company" | "quote" | "tax" | "team" | "account">(canManage ? "company" : "account");
   const [form, setForm] = useState(settings);
   const [saved, setSaved] = useState(false);
   const [accountName, setAccountName] = useState(profile?.fullName || currentUser?.displayName || "");
@@ -2300,6 +2323,8 @@ function SettingsPage({ settings, organizationName, onSave, currentUser, profile
   const [teamBusy, setTeamBusy] = useState(false);
   const [teamMessage, setTeamMessage] = useState("");
   const [teamError, setTeamError] = useState("");
+  const [deletionConfirmation, setDeletionConfirmation] = useState("");
+  const [deletionBusy, setDeletionBusy] = useState(false);
   const refreshTeam = async () => { const [nextMembers, nextInvitations] = await Promise.all([loadTeamMembers(), loadWorkspaceInvitations()]); setMembers(nextMembers); setInvitations(nextInvitations); };
   useEffect(() => { if (section === "team" && profile && canManageWorkspace(profile.role)) queueMicrotask(() => refreshTeam().catch((error: Error) => setTeamError(error.message))); }, [section, profile]);
   const inviteMember = async () => {
@@ -2330,15 +2355,15 @@ function SettingsPage({ settings, organizationName, onSave, currentUser, profile
       <PageHead title="Ayarlar" copy="Şirket ve teklif tercihlerini yönet." />
       <div className="settings-grid">
         <section className="panel settings-nav">
-          <button className={section === "company" ? "active" : ""} onClick={() => setSection("company")}>
+          {canManage && <button className={section === "company" ? "active" : ""} onClick={() => setSection("company")}>
             <Building2 /> Şirket bilgileri
-          </button>
-          <button className={section === "quote" ? "active" : ""} onClick={() => setSection("quote")}>
+          </button>}
+          {canManage && <button className={section === "quote" ? "active" : ""} onClick={() => setSection("quote")}>
             <FileText /> Teklif ayarları
-          </button>
-          <button className={section === "tax" ? "active" : ""} onClick={() => setSection("tax")}>
+          </button>}
+          {canManage && <button className={section === "tax" ? "active" : ""} onClick={() => setSection("tax")}>
             <Percent /> Vergi oranları
-          </button>
+          </button>}
           {profile && canManageWorkspace(profile.role) && <button className={section === "team" ? "active" : ""} onClick={() => setSection("team")}>
             <Users /> Ekip yönetimi
           </button>}
@@ -2392,6 +2417,8 @@ function SettingsPage({ settings, organizationName, onSave, currentUser, profile
             <div className="account-action-row"><div><b>Profil bilgileri</b><small>Hesap menüsünde görünen adınızı güncelleyin.</small></div><button type="button" className="secondary" onClick={() => accountAction("profile")} disabled={Boolean(accountBusy)}>{accountBusy === "profile" ? "Kaydediliyor..." : "Adı güncelle"}</button></div>
             {!currentUser.emailVerified && <div className="account-action-row"><div><b>E-posta doğrulama</b><small>Doğrulama bağlantısını yeniden gönderin.</small></div><button type="button" className="secondary" onClick={() => accountAction("verification")} disabled={Boolean(accountBusy)}>{accountBusy === "verification" ? "Gönderiliyor..." : "Tekrar gönder"}</button></div>}
             <div className="account-action-row"><div><b>Şifre güvenliği</b><small>Firebase üzerinden tek kullanımlık sıfırlama bağlantısı alın.</small></div><button type="button" className="secondary" onClick={() => accountAction("password")} disabled={Boolean(accountBusy)}>{accountBusy === "password" ? "Gönderiliyor..." : "Şifreyi sıfırla"}</button></div>
+            <div className="account-action-row"><div><b>Verilerimi dışa aktar</b><small>Müşteri, ürün, teklif ve ayarlarınızı taşınabilir JSON dosyası olarak indirin.</small></div><button type="button" className="secondary" onClick={onExport}>JSON indir</button></div>
+            {profile?.role === "owner" && <div className="deletion-request"><div><b>İşletme silme talebi</b><small>Bu işlem verileri hemen silmez. İnceleme için geri döndürülemez bir talep kaydı oluşturur.</small></div><label>Onaylamak için şirket adını yazın<input value={deletionConfirmation} onChange={(event) => setDeletionConfirmation(event.target.value)} placeholder={organizationName} /></label><button type="button" className="danger-button" disabled={deletionBusy || deletionConfirmation !== organizationName} onClick={async () => { setDeletionBusy(true); setAccountError(""); try { await requestOrganizationDeletion(deletionConfirmation); setAccountMessage("Silme talebiniz güvenli şekilde kaydedildi. Veriler henüz silinmedi."); setDeletionConfirmation(""); } catch (caught) { setAccountError(authErrorMessage(caught)); } finally { setDeletionBusy(false); } }}>{deletionBusy ? "Kaydediliyor..." : "Silme talebi oluştur"}</button></div>}
             {accountMessage && <div className="auth-success">{accountMessage}</div>}
             {accountError && <div className="auth-error">{accountError}</div>}
           </div>}

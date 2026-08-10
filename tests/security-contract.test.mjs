@@ -46,6 +46,13 @@ test("shared quotes expose only expiring token reads and immutable versions", ()
   assert.match(rules, /allow update, delete: if false/);
 });
 
+test("organization deletion is an owner-only immutable request", () => {
+  assert.match(rules, /match \/deletionRequests\/\{orgId\}/);
+  assert.match(rules, /request\.resource\.data\.requestedBy == request\.auth\.uid/);
+  assert.match(rules, /request\.resource\.data\.status == 'pending'/);
+  assert.match(rules, /allow update, delete: if false/);
+});
+
 test("OpenAI key stays server-side", () => {
   assert.match(aiRoute, /process\.env\.OPENAI_API_KEY/);
   assert.doesNotMatch(firebaseClient, /OPENAI_API_KEY/);
