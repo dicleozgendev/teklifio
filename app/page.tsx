@@ -41,10 +41,12 @@ import {
   type QuoteActivity,
   type QuoteVersion,
   updateWorkspaceMember,
+  updateQuoteStatus,
   type WorkspaceInvitation,
   type WorkspaceMember,
   type WorkspaceProfile,
   type WorkspaceSettings,
+  type WorkspaceQuoteStatus,
 } from "@/lib/firebase/workspace";
 import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
 import { authErrorMessage, canEditWorkspaceData, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
@@ -128,7 +130,7 @@ type Quote = {
   customerId: number;
   date: string;
   validUntil: string;
-  status: "Taslak" | "Gönderildi" | "Onaylandı";
+  status: WorkspaceQuoteStatus;
   items: QuoteItem[];
   note: string;
   currency?: string;
@@ -548,6 +550,10 @@ export default function Home() {
       saveQuote(quote).catch((error: Error) => setSyncError(error.message));
     }
   };
+  const changeQuoteStatus = async (quoteId: string, status: WorkspaceQuoteStatus) => {
+    if (isFirebaseConfigured) await updateQuoteStatus(quoteId, status);
+    setQuotes((current) => current.map((quote) => quote.id === quoteId ? { ...quote, status } : quote));
+  };
 
   const finishOnboarding = async (next: WorkspaceSettings) => {
     await updateSettings(next);
@@ -827,6 +833,7 @@ export default function Home() {
               )!}
               settings={settings}
               editable={mayEdit}
+              onStatusChange={changeQuoteStatus}
               onBack={() => go("quotes")}
             />
           )}
@@ -928,7 +935,7 @@ function Dashboard({
           icon={<FileText />}
           tone="blue"
           label="Aktif teklifler"
-          value={String(quotes.filter((q) => q.status !== "Onaylandı").length)}
+          value={String(quotes.filter((q) => q.status === "Taslak" || q.status === "Gönderildi").length)}
           trend="2 yeni"
           detail="bu hafta"
         />
@@ -1452,7 +1459,7 @@ function Quotes({
   editable: boolean;
 }) {
   const [q, setQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "Gönderildi" | "Onaylandı">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | WorkspaceQuoteStatus>("all");
   const filteredQuotes = quotes.filter((quote) => {
     if (statusFilter !== "all" && quote.status !== statusFilter) return false;
     const customer = customers.find((item) => item.id === quote.customerId);
@@ -1474,6 +1481,15 @@ function Quotes({
       <div className="summary-chips">
         <button
           type="button"
+          className={statusFilter === "Taslak" ? "active" : ""}
+          aria-pressed={statusFilter === "Taslak"}
+          onClick={() => setStatusFilter("Taslak")}
+        >
+          <FileText />
+          <span><small>Taslaklar</small><b>{quotes.filter((x) => x.status === "Taslak").length}</b></span>
+        </button>
+        <button
+          type="button"
           className={statusFilter === "all" ? "active" : ""}
           aria-pressed={statusFilter === "all"}
           onClick={() => setStatusFilter("all")}
@@ -1483,6 +1499,15 @@ function Quotes({
             <small>Tüm teklifler</small>
             <b>{quotes.length}</b>
           </span>
+        </button>
+        <button
+          type="button"
+          className={statusFilter === "Reddedildi" ? "active" : ""}
+          aria-pressed={statusFilter === "Reddedildi"}
+          onClick={() => setStatusFilter("Reddedildi")}
+        >
+          <X />
+          <span><small>Reddedilen</small><b>{quotes.filter((x) => x.status === "Reddedildi").length}</b></span>
         </button>
         <button
           type="button"
@@ -2100,12 +2125,14 @@ function QuoteDetail({
   settings,
   onBack,
   editable,
+  onStatusChange,
 }: {
   quote: Quote;
   customer: Customer;
   settings: WorkspaceSettings;
   onBack: () => void;
   editable: boolean;
+  onStatusChange: (quoteId: string, status: WorkspaceQuoteStatus) => Promise<void>;
 }) {
   const totals = quoteTotals(quote.items);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -2115,6 +2142,7 @@ function QuoteDetail({
   const [shares, setShares] = useState<QuoteShare[]>([]);
   const [versions, setVersions] = useState<QuoteVersion[]>([]);
   const [activities, setActivities] = useState<QuoteActivity[]>([]);
+  const [statusBusy, setStatusBusy] = useState(false);
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     queueMicrotask(() => Promise.all([loadQuoteShares(quote.id), loadQuoteVersions(quote.id), loadQuoteActivities(quote.id)]).then(([nextShares, nextVersions, nextActivities]) => { setShares(nextShares); setVersions(nextVersions); setActivities(nextActivities); }).catch(() => undefined));
@@ -2151,6 +2179,7 @@ function QuoteDetail({
           </div>
         </div>
         <div className="detail-actions">
+          {editable && <label className="quote-status-control">Durum<select aria-label="Teklif durumu" value={quote.status} disabled={statusBusy} onChange={async (event) => { const status = event.target.value as WorkspaceQuoteStatus; setStatusBusy(true); setShareError(""); try { await onStatusChange(quote.id, status); setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "status_changed", status }, ...current]); } catch (caught) { setShareError(authErrorMessage(caught)); } finally { setStatusBusy(false); } }}><option>Taslak</option><option>Gönderildi</option><option>Onaylandı</option><option>Reddedildi</option></select></label>}
           {isFirebaseConfigured && editable && <button className="secondary" onClick={shareQuote} disabled={shareBusy}><Share2 /> {shareBusy ? "Hazırlanıyor..." : "Paylaşım bağlantısı"}</button>}
           <button
             className="secondary"
@@ -2271,7 +2300,7 @@ function QuoteDetail({
         </article>
         <aside className="activity panel">
           <h3>Teklif hareketleri</h3>
-          {activities.length > 0 && <div className="recorded-activities">{activities.slice(0, 6).map((activity) => <div key={activity.id}><i><Check /></i><span><b>{activity.type === "created" ? "Teklif kaydedildi" : activity.type === "pdf_downloaded" ? "PDF indirildi" : activity.type === "share_created" ? "Paylaşım bağlantısı oluşturuldu" : "Paylaşım bağlantısı iptal edildi"}</b><small>{activity.createdAt ? activity.createdAt.toDate().toLocaleString("tr-TR") : "Şimdi"}</small></span></div>)}</div>}
+          {activities.length > 0 && <div className="recorded-activities">{activities.slice(0, 6).map((activity) => <div key={activity.id}><i><Check /></i><span><b>{activity.type === "created" ? "Teklif kaydedildi" : activity.type === "pdf_downloaded" ? "PDF indirildi" : activity.type === "share_created" ? "Paylaşım bağlantısı oluşturuldu" : activity.type === "share_revoked" ? "Paylaşım bağlantısı iptal edildi" : `Durum değişti: ${activity.status}`}</b><small>{activity.createdAt ? activity.createdAt.toDate().toLocaleString("tr-TR") : "Şimdi"}</small></span></div>)}</div>}
           <div className="timeline">
             <div className="done">
               <i>

@@ -56,7 +56,8 @@ test("organization deletion is an owner-only immutable request", () => {
 test("quote activity records are organization-scoped and immutable", () => {
   assert.match(rules, /match \/quoteActivities\/\{documentId\}/);
   assert.match(rules, /request\.resource\.data\.actorId == request\.auth\.uid/);
-  assert.match(rules, /request\.resource\.data\.type in \['created', 'pdf_downloaded', 'share_created', 'share_revoked'\]/);
+  assert.match(rules, /request\.resource\.data\.type in \['created', 'pdf_downloaded', 'share_created', 'share_revoked', 'status_changed'\]/);
+  assert.match(rules, /request\.resource\.data\.status in \['Taslak', 'Gönderildi', 'Onaylandı', 'Reddedildi'\]/);
   assert.match(rules, /allow update, delete: if false/);
 });
 

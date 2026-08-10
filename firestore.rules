@@ -158,7 +158,8 @@ service cloud.firestore {
       allow read: if ownsExistingDocument();
       allow create: if writesOwnOrganization()
         && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.type in ['created', 'pdf_downloaded', 'share_created', 'share_revoked'];
+        && request.resource.data.type in ['created', 'pdf_downloaded', 'share_created', 'share_revoked', 'status_changed']
+        && (!('status' in request.resource.data) || request.resource.data.status in ['Taslak', 'Gönderildi', 'Onaylandı', 'Reddedildi']);
       allow update, delete: if false;
     }
 

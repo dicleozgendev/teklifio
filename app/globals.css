@@ -783,6 +783,8 @@ tr:last-child td {
 .status.taslak i {
   background: #98949f;
 }
+.status.reddedildi { background: #fff0f0; color: #b83232; }
+.status.reddedildi i { background: #d14343; }
 .icon-btn {
   background: none;
   border: 0;
@@ -983,9 +985,12 @@ tr:last-child td {
 }
 .summary-chips {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 18px;
 }
+.quote-status-control { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.quote-status-control select { min-width: 130px; }
 .summary-chips > button {
   background: white;
   border: 1px solid var(--line);

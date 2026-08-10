@@ -18,14 +18,15 @@ import { normalizeWorkspaceRole, type WorkspaceRole } from "../auth-utils";
 export type WorkspaceCustomer = { id: number; name: string; company: string; email: string; phone: string; address?: string; taxOffice?: string; taxNumber?: string; notes?: string; initials: string; color: string };
 export type WorkspaceProduct = { id: number; name: string; code: string; type: "Ürün" | "Hizmet"; price: number; vat: number; unit: string; description?: string };
 export type WorkspaceQuoteItem = { id: number; productId: number; name: string; qty: number; price: number; discount: number; vat: number };
-export type WorkspaceQuote = { id: string; customerId: number; date: string; validUntil: string; status: "Taslak" | "Gönderildi" | "Onaylandı"; items: WorkspaceQuoteItem[]; note: string; currency?: string };
+export type WorkspaceQuoteStatus = "Taslak" | "Gönderildi" | "Onaylandı" | "Reddedildi";
+export type WorkspaceQuote = { id: string; customerId: number; date: string; validUntil: string; status: WorkspaceQuoteStatus; items: WorkspaceQuoteItem[]; note: string; currency?: string };
 export type WorkspaceSettings = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; validityDays: number; quotePrefix: string; currency: string; defaultNote: string; footerText: string; vatRates: number[]; defaultVat: number };
 export type WorkspaceProfile = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled"; emailVerificationRequired: boolean };
 export type WorkspaceMember = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled" };
 export type WorkspaceInvitation = { id: string; organizationId: string; organizationName: string; email: string; role: Exclude<WorkspaceRole, "owner">; status: "pending" | "accepted" | "cancelled"; expiresAt: Timestamp };
 export type QuoteVersion = { id: string; quoteId: string; organizationId: string; createdBy: string; createdAt?: Timestamp; snapshot: WorkspaceQuote };
 export type QuoteShare = { token: string; quoteId: string; organizationId: string; active: boolean; expiresAt: Timestamp; quote: WorkspaceQuote; customer: WorkspaceCustomer; settings: WorkspaceSettings };
-export type QuoteActivity = { id: string; quoteId: string; organizationId: string; actorId: string; type: "created" | "pdf_downloaded" | "share_created" | "share_revoked"; createdAt?: Timestamp };
+export type QuoteActivity = { id: string; quoteId: string; organizationId: string; actorId: string; type: "created" | "pdf_downloaded" | "share_created" | "share_revoked" | "status_changed"; status?: WorkspaceQuoteStatus; createdAt?: Timestamp };
 
 async function getOrganizationId() {
   const services = getFirebaseServices();
@@ -238,6 +239,16 @@ export async function loadQuoteActivities(quoteId: string) {
   const organizationId = await getOrganizationId();
   const snapshot = await getDocs(query(collection(services.db, "quoteActivities"), where("organizationId", "==", organizationId), where("quoteId", "==", quoteId)));
   return snapshot.docs.map((entry) => entry.data() as QuoteActivity).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+}
+
+export async function updateQuoteStatus(quoteId: string, status: WorkspaceQuoteStatus) {
+  const services = getFirebaseServices(); const user = services?.auth.currentUser;
+  if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
+  const organizationId = await getOrganizationId(); const activityId = `${organizationId}_${quoteId}_${crypto.randomUUID()}`;
+  const batch = writeBatch(services.db);
+  batch.update(doc(services.db, "quotes", `${organizationId}_${quoteId}`), { status, updatedAt: serverTimestamp() });
+  batch.set(doc(services.db, "quoteActivities", activityId), { id: activityId, quoteId, organizationId, actorId: user.uid, type: "status_changed", status, createdAt: serverTimestamp() });
+  await batch.commit();
 }
 
 export async function loadQuoteVersions(quoteId: string) {
