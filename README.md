@@ -34,7 +34,8 @@ The quote assistant accepts a natural-language request, matches only customers a
 - Quote list, status filters, search, detail view, and Firestore persistence
 - Quote and VAT defaults configurable from the settings screen
 - Modern, print-ready PDF generation with company, customer, line-item, total, note, and approval information
-- Firebase Authentication with email/password registration, sign-in, sign-out, and session restoration
+- Firebase Authentication with email/password registration, verification, password reset, sign-in, sign-out, and session restoration
+- First-run onboarding and account-security settings
 - Organization-scoped Firestore data protected by Security Rules
 - Legal draft pages for privacy, KVKK disclosure, and terms of use
 - Environment-controlled demo notice
@@ -205,14 +206,14 @@ The hosted demo may contain seeded, fictional records and example financial valu
 
 Currently implemented:
 
-- Email/password authentication and one organization created during registration
+- Email/password authentication, email verification, password reset, and one organization created during registration
+- First-run organization onboarding and a role-ready owner profile
 - Organization-scoped CRM, catalog, quotes, PDF export, and AI-assisted draft generation
 - A deterministic Turkish parser fallback for a limited set of quote instructions
 
 Not currently implemented:
 
 - Team invitations and multi-role organization administration
-- Password-reset and email-verification workflows
 - Payment processing, subscriptions, and billing
 - Sending quotes by email or collecting legally binding e-signatures
 - Server-side PDF storage or version history

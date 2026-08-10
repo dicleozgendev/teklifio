@@ -26,6 +26,10 @@ service cloud.firestore {
       return hasWorkspace() && request.resource.data.organizationId == organizationId();
     }
 
+    function validRole(role) {
+      return role in ['owner', 'admin', 'member', 'viewer'];
+    }
+
     match /organizations/{orgId} {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid;
@@ -43,13 +47,16 @@ service cloud.firestore {
       allow create: if signedIn()
         && userId == request.auth.uid
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'owner'
+        && request.resource.data.emailVerificationRequired == true
         && getAfter(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid;
       allow read: if signedIn() && userId == request.auth.uid;
       allow update: if signedIn()
         && userId == request.auth.uid
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.organizationId == resource.data.organizationId
-        && request.resource.data.role == resource.data.role;
+        && request.resource.data.role == resource.data.role
+        && validRole(request.resource.data.role);
       allow delete: if false;
     }
 

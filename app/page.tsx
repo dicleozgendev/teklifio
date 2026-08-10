@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { AuthScreen } from "@/components/auth-screen";
+import { Onboarding } from "@/components/onboarding";
+import { VerifyEmailScreen } from "@/components/verify-email-screen";
 import { downloadQuotePdf } from "@/lib/quote-pdf";
 import {
   deterministicQuoteAi,
@@ -18,13 +20,17 @@ import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase/client
 import {
   deleteCustomer,
   deleteProduct,
+  completeWorkspaceOnboarding,
   loadWorkspaceData,
   saveCustomer,
   saveProduct,
   saveQuote,
   saveWorkspaceSettings,
+  type WorkspaceProfile,
   type WorkspaceSettings,
 } from "@/lib/firebase/workspace";
+import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
+import { authErrorMessage } from "@/lib/auth-utils";
 import {
   ArrowLeft,
   ArrowRight,
@@ -41,6 +47,7 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  Mail,
   Menu,
   MoreHorizontal,
   PackagePlus,
@@ -48,10 +55,12 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   Sparkles,
   Trash2,
   TrendingUp,
   UserPlus,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -346,6 +355,9 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(isFirebaseConfigured);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [workspaceProfile, setWorkspaceProfile] = useState<WorkspaceProfile | null>(null);
+  const [organizationName, setOrganizationName] = useState("Çalışma alanı");
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
@@ -420,6 +432,7 @@ export default function Home() {
       setSyncError("");
       loadWorkspaceData()
         .then(async (data) => {
+          if (data.profile.emailVerificationRequired && !currentUser.emailVerified) return data;
           if (
             !data.customers.length &&
             !data.products.length &&
@@ -441,6 +454,9 @@ export default function Home() {
           setProducts(data.products);
           setQuotes(data.quotes);
           setSettings({ ...defaultSettings, ...data.settings });
+          setWorkspaceProfile(data.profile);
+          setOrganizationName(data.organizationName);
+          setOnboardingCompleted(data.onboardingCompleted);
           if (data.quotes[0]) setSelectedQuote(data.quotes[0].id);
         })
         .catch(async (error: Error) => {
@@ -452,6 +468,9 @@ export default function Home() {
               setProducts(recovered.products);
               setQuotes(recovered.quotes);
               setSettings({ ...defaultSettings, ...recovered.settings });
+              setWorkspaceProfile(recovered.profile);
+              setOrganizationName(recovered.organizationName);
+              setOnboardingCompleted(recovered.onboardingCompleted);
               setSyncError("");
               return;
             }
@@ -512,6 +531,12 @@ export default function Home() {
     }
   };
 
+  const finishOnboarding = async (next: WorkspaceSettings) => {
+    await updateSettings(next);
+    await completeWorkspaceOnboarding();
+    setOnboardingCompleted(true);
+  };
+
   const signOut = async () => {
     setProfileOpen(false);
     const services = getFirebaseServices();
@@ -528,6 +553,9 @@ export default function Home() {
     );
   }
   if (isFirebaseConfigured && !currentUser) return <AuthScreen />;
+  if (isFirebaseConfigured && currentUser && workspaceProfile?.emailVerificationRequired && !currentUser.emailVerified) {
+    return <VerifyEmailScreen email={currentUser.email ?? workspaceProfile.email} />;
+  }
 
   const displayEmail = currentUser?.email ?? "demo@teklifio.com";
   const displayInitials = currentUser?.displayName
@@ -559,6 +587,9 @@ export default function Home() {
 
   return (
     <div className="app-shell">
+      {isFirebaseConfigured && currentUser && !onboardingCompleted && (
+        <Onboarding organizationName={organizationName} settings={settings} onComplete={finishOnboarding} />
+      )}
       {mobileOpen && (
         <button
           className="scrim"
@@ -767,7 +798,7 @@ export default function Home() {
               onBack={() => go("quotes")}
             />
           )}
-          {screen === "settings" && <SettingsPage settings={settings} onSave={updateSettings} />}
+          {screen === "settings" && <SettingsPage settings={settings} onSave={updateSettings} currentUser={currentUser} profile={workspaceProfile} onAccountNameChange={async (fullName) => { await updateAccountName(fullName); setWorkspaceProfile((current) => current ? { ...current, fullName } : current); }} />}
         </div>
         {searchRecord?.kind === "customer" && <Modal title={searchRecord.record.company} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Yetkili:</b> {searchRecord.record.name || "Belirtilmedi"}</p><p><b>E-posta:</b> {searchRecord.record.email || "Belirtilmedi"}</p><p><b>Telefon:</b> {searchRecord.record.phone || "Belirtilmedi"}</p><p><b>Adres:</b> {searchRecord.record.address || "Belirtilmedi"}</p><p><b>Vergi:</b> {[searchRecord.record.taxOffice, searchRecord.record.taxNumber].filter(Boolean).join(" · ") || "Belirtilmedi"}</p><p><b>Not:</b> {searchRecord.record.notes || "Belirtilmedi"}</p></div></Modal>}
         {searchRecord?.kind === "product" && <Modal title={searchRecord.record.name} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Kod:</b> {searchRecord.record.code || "Belirtilmedi"}</p><p><b>Tür:</b> {searchRecord.record.type}</p><p><b>Birim:</b> {searchRecord.record.unit}</p><p><b>Birim fiyat:</b> {currency(searchRecord.record.price)}</p><p><b>Varsayılan KDV:</b> %{searchRecord.record.vat}</p><p><b>Açıklama:</b> {searchRecord.record.description || "Belirtilmedi"}</p></div></Modal>}
@@ -2220,10 +2251,14 @@ function QuoteDetail({
   );
 }
 
-function SettingsPage({ settings, onSave }: { settings: WorkspaceSettings; onSave: (settings: WorkspaceSettings) => Promise<void> }) {
-  const [section, setSection] = useState<"company" | "quote" | "tax">("company");
+function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameChange }: { settings: WorkspaceSettings; onSave: (settings: WorkspaceSettings) => Promise<void>; currentUser: User | null; profile: WorkspaceProfile | null; onAccountNameChange: (fullName: string) => Promise<void> }) {
+  const [section, setSection] = useState<"company" | "quote" | "tax" | "account">("company");
   const [form, setForm] = useState(settings);
   const [saved, setSaved] = useState(false);
+  const [accountName, setAccountName] = useState(profile?.fullName || currentUser?.displayName || "");
+  const [accountBusy, setAccountBusy] = useState<"profile" | "verification" | "password" | null>(null);
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountError, setAccountError] = useState("");
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const vatRates = [...new Set(form.vatRates.map(Number))].filter((rate) => Number.isFinite(rate) && rate >= 0 && rate <= 100).sort((a, b) => a - b);
@@ -2231,6 +2266,15 @@ function SettingsPage({ settings, onSave }: { settings: WorkspaceSettings; onSav
     await onSave({ ...form, vatRates }); setSaved(true); window.setTimeout(() => setSaved(false), 2500);
   };
   const set = (key: keyof WorkspaceSettings, value: WorkspaceSettings[keyof WorkspaceSettings]) => setForm({ ...form, [key]: value });
+  const accountAction = async (action: "profile" | "verification" | "password") => {
+    setAccountBusy(action); setAccountMessage(""); setAccountError("");
+    try {
+      if (action === "profile") { await onAccountNameChange(accountName); setAccountMessage("Hesap adı güncellendi."); }
+      if (action === "verification") { await resendVerificationEmail(); setAccountMessage("Doğrulama e-postası yeniden gönderildi."); }
+      if (action === "password" && currentUser?.email) { await requestPasswordReset(currentUser.email); setAccountMessage("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi."); }
+    } catch (caught) { setAccountError(authErrorMessage(caught)); }
+    finally { setAccountBusy(null); }
+  };
   return (
     <>
       <PageHead title="Ayarlar" copy="Şirket ve teklif tercihlerini yönet." />
@@ -2245,15 +2289,18 @@ function SettingsPage({ settings, onSave }: { settings: WorkspaceSettings; onSav
           <button className={section === "tax" ? "active" : ""} onClick={() => setSection("tax")}>
             <Percent /> Vergi oranları
           </button>
+          {currentUser && <button className={section === "account" ? "active" : ""} onClick={() => setSection("account")}>
+            <UserRound /> Hesabım
+          </button>}
         </section>
         <form className="panel settings-form" onSubmit={submit}>
           <div className="section-title">
             <span>
-              {section === "company" ? <Building2 /> : section === "quote" ? <FileText /> : <Percent />}
+              {section === "company" ? <Building2 /> : section === "quote" ? <FileText /> : section === "tax" ? <Percent /> : <ShieldCheck />}
             </span>
             <div>
-              <h3>{section === "company" ? "Şirket bilgileri" : section === "quote" ? "Teklif ayarları" : "Vergi oranları"}</h3>
-              <p>{section === "company" ? "Teklif ve PDF belgelerinde görünecek bilgiler." : section === "quote" ? "Yeni tekliflerin varsayılan tercihleri." : "Katalog ve teklif kalemlerinde kullanılabilecek KDV oranları."}</p>
+              <h3>{section === "company" ? "Şirket bilgileri" : section === "quote" ? "Teklif ayarları" : section === "tax" ? "Vergi oranları" : "Hesap güvenliği"}</h3>
+              <p>{section === "company" ? "Teklif ve PDF belgelerinde görünecek bilgiler." : section === "quote" ? "Yeni tekliflerin varsayılan tercihleri." : section === "tax" ? "Katalog ve teklif kalemlerinde kullanılabilecek KDV oranları." : "Profilinizi, e-posta doğrulamasını ve şifrenizi yönetin."}</p>
             </div>
           </div>
           {section === "company" && <div className="form-grid">
@@ -2279,12 +2326,21 @@ function SettingsPage({ settings, onSave }: { settings: WorkspaceSettings; onSav
             <label className="full">KDV oranları (%)<input value={form.vatRates.join(", ")} onChange={(e) => set("vatRates", e.target.value.split(",").map((part) => Number(part.trim())).filter(Number.isFinite))} placeholder="0, 1, 10, 20" /><small>0–100 arasında, virgülle ayırın.</small></label>
             <label>Varsayılan KDV<select value={form.defaultVat} onChange={(e) => set("defaultVat", Number(e.target.value))}>{form.vatRates.map((rate) => <option key={rate} value={rate}>%{rate}</option>)}</select></label>
           </div>}
-          <div className="settings-save">
+          {section === "account" && currentUser && <div className="account-settings">
+            <div className="account-status-card"><span className={currentUser.emailVerified ? "verified" : "pending"}>{currentUser.emailVerified ? <CheckCircle2 /> : <Mail />}</span><div><b>{currentUser.email}</b><small>{currentUser.emailVerified ? "E-posta doğrulandı" : "E-posta doğrulaması bekleniyor"}</small></div><em>{profile?.role === "owner" ? "İşletme sahibi" : profile?.role === "admin" ? "Yönetici" : profile?.role === "viewer" ? "Görüntüleyici" : "Üye"}</em></div>
+            <label>Ad soyad<input value={accountName} onChange={(event) => setAccountName(event.target.value)} /></label>
+            <div className="account-action-row"><div><b>Profil bilgileri</b><small>Hesap menüsünde görünen adınızı güncelleyin.</small></div><button type="button" className="secondary" onClick={() => accountAction("profile")} disabled={Boolean(accountBusy)}>{accountBusy === "profile" ? "Kaydediliyor..." : "Adı güncelle"}</button></div>
+            {!currentUser.emailVerified && <div className="account-action-row"><div><b>E-posta doğrulama</b><small>Doğrulama bağlantısını yeniden gönderin.</small></div><button type="button" className="secondary" onClick={() => accountAction("verification")} disabled={Boolean(accountBusy)}>{accountBusy === "verification" ? "Gönderiliyor..." : "Tekrar gönder"}</button></div>}
+            <div className="account-action-row"><div><b>Şifre güvenliği</b><small>Firebase üzerinden tek kullanımlık sıfırlama bağlantısı alın.</small></div><button type="button" className="secondary" onClick={() => accountAction("password")} disabled={Boolean(accountBusy)}>{accountBusy === "password" ? "Gönderiliyor..." : "Şifreyi sıfırla"}</button></div>
+            {accountMessage && <div className="auth-success">{accountMessage}</div>}
+            {accountError && <div className="auth-error">{accountError}</div>}
+          </div>}
+          {section !== "account" && <div className="settings-save">
             {saved && <span className="save-confirmation">Kaydedildi</span>}
             <button className="primary" type="submit">
               <Check /> Ayarları kaydet
             </button>
-          </div>
+          </div>}
         </form>
       </div>
     </>

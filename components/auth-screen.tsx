@@ -1,36 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { FirebaseError } from "firebase/app";
-import { ArrowRight, Building2, CheckCircle2, FileText, LockKeyhole, Mail } from "lucide-react";
-import { loginWithEmail, registerWithOrganization } from "@/lib/firebase/auth";
-
-const authError = (error: unknown) => {
-  if (!(error instanceof FirebaseError)) return "İşlem tamamlanamadı. Lütfen tekrar deneyin.";
-  if (error.code === "auth/email-already-in-use") return "Bu e-posta adresi zaten kullanılıyor.";
-  if (error.code === "auth/invalid-credential") return "E-posta veya şifre hatalı.";
-  if (error.code === "auth/weak-password") return "Daha güçlü bir şifre seçin.";
-  if (error.code === "auth/operation-not-allowed")
-    return "Firebase Console'da E-posta/Şifre giriş yöntemi henüz etkin değil.";
-  if (error.code === "auth/unauthorized-domain")
-    return "localhost, Firebase Authentication yetkili alan adlarında bulunmuyor.";
-  if (error.code === "auth/network-request-failed")
-    return "Firebase ağına ulaşılamadı. İnternet bağlantısını kontrol edin.";
-  if (error.code === "permission-denied")
-    return "Firestore erişimi reddedildi. Projenin güvenlik kurallarının yayımlandığını kontrol edin.";
-  if (error.code === "unavailable")
-    return "Firestore servisine şu anda ulaşılamıyor. Lütfen kısa süre sonra tekrar deneyin.";
-  return `Kimlik doğrulama işlemi tamamlanamadı (${error.code}).`;
-};
+import { ArrowLeft, ArrowRight, Building2, CheckCircle2, FileText, LockKeyhole, Mail } from "lucide-react";
+import { loginWithEmail, registerWithOrganization, requestPasswordReset } from "@/lib/firebase/auth";
+import { authErrorMessage } from "@/lib/auth-utils";
 
 export function AuthScreen() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -38,9 +21,13 @@ export function AuthScreen() {
     setError("");
     try {
       if (mode === "login") await loginWithEmail(email, password);
-      else await registerWithOrganization({ email, password, fullName, organizationName });
+      else if (mode === "signup") await registerWithOrganization({ email, password, fullName, organizationName });
+      else {
+        await requestPasswordReset(email);
+        setSuccess("Şifre sıfırlama bağlantısı gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.");
+      }
     } catch (caught) {
-      setError(authError(caught));
+      setError(authErrorMessage(caught));
     } finally {
       setLoading(false);
     }
@@ -55,14 +42,17 @@ export function AuthScreen() {
       <section className="auth-form-wrap">
         <form className="auth-card" onSubmit={submit}>
           <div className="auth-mobile-brand"><FileText /> teklifio</div>
-          <h2>{mode === "login" ? "Tekrar hoş geldiniz" : "Çalışma alanınızı oluşturun"}</h2>
-          <p>{mode === "login" ? "Teklifio hesabınıza giriş yapın." : "İşletmeniz için güvenli bir hesap oluşturun."}</p>
+          {mode === "reset" && <button type="button" className="auth-back" onClick={() => { setMode("login"); setError(""); setSuccess(""); }}><ArrowLeft /> Girişe dön</button>}
+          <h2>{mode === "login" ? "Tekrar hoş geldiniz" : mode === "signup" ? "Çalışma alanınızı oluşturun" : "Şifrenizi sıfırlayın"}</h2>
+          <p>{mode === "login" ? "Teklifio hesabınıza giriş yapın." : mode === "signup" ? "İşletmeniz için güvenli bir hesap oluşturun." : "Hesabınıza bağlı e-posta adresine güvenli bir bağlantı gönderelim."}</p>
           {mode === "signup" && <><label>Ad soyad<div className="auth-input"><Mail /><input value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div></label><label>Şirket / çalışma alanı<div className="auth-input"><Building2 /><input value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required /></div></label></>}
           <label>E-posta<div className="auth-input"><Mail /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div></label>
-          <label>Şifre<div className="auth-input"><LockKeyhole /><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete={mode === "login" ? "current-password" : "new-password"} /></div></label>
+          {mode !== "reset" && <label>Şifre<div className="auth-input"><LockKeyhole /><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete={mode === "login" ? "current-password" : "new-password"} /></div></label>}
+          {mode === "login" && <button type="button" className="forgot-password" onClick={() => { setMode("reset"); setError(""); setSuccess(""); }}>Şifremi unuttum</button>}
           {error && <div className="auth-error">{error}</div>}
-          <button className="primary auth-submit" disabled={loading}>{loading ? "Lütfen bekleyin..." : mode === "login" ? "Giriş Yap" : "Hesap Oluştur"}<ArrowRight /></button>
-          <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>
+          {success && <div className="auth-success">{success}</div>}
+          <button className="primary auth-submit" disabled={loading}>{loading ? "Lütfen bekleyin..." : mode === "login" ? "Giriş Yap" : mode === "signup" ? "Hesap Oluştur" : "Bağlantı Gönder"}<ArrowRight /></button>
+          {mode !== "reset" && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
         </form>
       </section>
     </main>

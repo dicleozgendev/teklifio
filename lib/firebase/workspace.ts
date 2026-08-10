@@ -11,12 +11,14 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseServices } from "./client";
+import { normalizeWorkspaceRole, type WorkspaceRole } from "../auth-utils";
 
 export type WorkspaceCustomer = { id: number; name: string; company: string; email: string; phone: string; address?: string; taxOffice?: string; taxNumber?: string; notes?: string; initials: string; color: string };
 export type WorkspaceProduct = { id: number; name: string; code: string; type: "Ürün" | "Hizmet"; price: number; vat: number; unit: string; description?: string };
 export type WorkspaceQuoteItem = { id: number; productId: number; name: string; qty: number; price: number; discount: number; vat: number };
 export type WorkspaceQuote = { id: string; customerId: number; date: string; validUntil: string; status: "Taslak" | "Gönderildi" | "Onaylandı"; items: WorkspaceQuoteItem[]; note: string; currency?: string };
 export type WorkspaceSettings = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; validityDays: number; quotePrefix: string; currency: string; defaultNote: string; footerText: string; vatRates: number[]; defaultVat: number };
+export type WorkspaceProfile = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; emailVerificationRequired: boolean };
 
 async function getOrganizationId() {
   const services = getFirebaseServices();
@@ -35,6 +37,8 @@ export async function loadWorkspaceData() {
   const services = getFirebaseServices();
   if (!services) throw new Error("Firebase yapılandırılmadı.");
   const organizationId = await getOrganizationId();
+  const user = services.auth.currentUser;
+  if (!user) throw new Error("Firebase oturumu bulunamadı.");
   const own = (name: string) =>
     getDocs(query(collection(services.db, name), where("organizationId", "==", organizationId)));
   const [customerDocs, productDocs, quoteDocs, itemDocs] = await Promise.all([
@@ -49,8 +53,41 @@ export async function loadWorkspaceData() {
     return { ...data, items: allItems.filter((item) => item.quoteId === data.id) };
   });
   quotes.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  const organization = await getDoc(doc(services.db, "organizations", organizationId));
-  return { customers, products, quotes, settings: organization.data()?.settings as WorkspaceSettings | undefined };
+  const [organization, profileDocument] = await Promise.all([
+    getDoc(doc(services.db, "organizations", organizationId)),
+    getDoc(doc(services.db, "users", user.uid)),
+  ]);
+  const profileData = profileDocument.data();
+  const profile: WorkspaceProfile = {
+    uid: user.uid,
+    organizationId,
+    fullName: String(profileData?.fullName ?? user.displayName ?? ""),
+    email: String(profileData?.email ?? user.email ?? ""),
+    role: normalizeWorkspaceRole(profileData?.role),
+    emailVerificationRequired: profileData?.emailVerificationRequired === true,
+  };
+  const organizationData = organization.data();
+  return {
+    customers,
+    products,
+    quotes,
+    settings: organizationData?.settings as WorkspaceSettings | undefined,
+    organizationName: String(organizationData?.name ?? "Çalışma alanı"),
+    onboardingCompleted: typeof organizationData?.onboardingCompleted === "boolean"
+      ? organizationData.onboardingCompleted
+      : true,
+    profile,
+  };
+}
+
+export async function completeWorkspaceOnboarding() {
+  const services = getFirebaseServices();
+  if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  await setDoc(doc(services.db, "organizations", organizationId), {
+    onboardingCompleted: true,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 export async function saveCustomer(customer: WorkspaceCustomer) {
