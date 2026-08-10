@@ -26,6 +26,7 @@ import {
   createWorkspaceInvitation,
   loadTeamMembers,
   loadQuoteShares,
+  loadQuoteActivities,
   loadQuoteVersions,
   loadWorkspaceInvitations,
   loadWorkspaceData,
@@ -34,8 +35,10 @@ import {
   saveQuote,
   saveWorkspaceSettings,
   revokeQuoteShare,
+  logQuoteActivity,
   requestOrganizationDeletion,
   type QuoteShare,
+  type QuoteActivity,
   type QuoteVersion,
   updateWorkspaceMember,
   type WorkspaceInvitation,
@@ -773,7 +776,9 @@ export default function Home() {
           {screen === "dashboard" && (
             <Dashboard
               customers={customers}
+              products={products}
               quotes={quotes}
+              settings={settings}
               onNew={() => go("new-quote")}
               onQuote={openQuote}
               onQuotes={() => go("quotes")}
@@ -867,7 +872,9 @@ function PageHead({
 
 function Dashboard({
   customers,
+  products,
   quotes,
+  settings,
   onNew,
   onQuote,
   onQuotes,
@@ -876,7 +883,9 @@ function Dashboard({
   editable,
 }: {
   customers: Customer[];
+  products: Product[];
   quotes: Quote[];
+  settings: WorkspaceSettings;
   onNew: () => void;
   onQuote: (id: string) => void;
   onQuotes: () => void;
@@ -887,6 +896,13 @@ function Dashboard({
   const approved = quotes
     .filter((q) => q.status === "Onaylandı")
     .reduce((s, q) => s + quoteTotals(q.items).total, 0);
+  const setupSteps = [
+    { label: "Şirket bilgilerini tamamla", done: Boolean(settings.companyName.trim() && settings.email.trim()) },
+    { label: "İlk müşterini ekle", done: customers.length > 0 },
+    { label: "Ürün veya hizmet ekle", done: products.length > 0 },
+    { label: "İlk teklifini oluştur", done: quotes.length > 0 },
+  ];
+  const completedSetup = setupSteps.filter((item) => item.done).length;
   return (
     <>
       <PageHead
@@ -933,6 +949,7 @@ function Dashboard({
           detail="bu ay"
         />
       </section>
+      <section className="panel setup-checklist"><div><span className="eyebrow">BAŞLANGIÇ KONTROLÜ</span><h3>Çalışma alanı kurulumu</h3><p>{completedSetup}/4 adım tamamlandı</p></div><div>{setupSteps.map((item) => <span className={item.done ? "done" : ""} key={item.label}>{item.done ? <CheckCircle2 /> : <Clock3 />}{item.label}</span>)}</div></section>
       <section className="dashboard-grid">
         <div className="panel chart-panel">
           <div className="panel-head">
@@ -2097,21 +2114,24 @@ function QuoteDetail({
   const [shareError, setShareError] = useState("");
   const [shares, setShares] = useState<QuoteShare[]>([]);
   const [versions, setVersions] = useState<QuoteVersion[]>([]);
+  const [activities, setActivities] = useState<QuoteActivity[]>([]);
   useEffect(() => {
     if (!isFirebaseConfigured) return;
-    queueMicrotask(() => Promise.all([loadQuoteShares(quote.id), loadQuoteVersions(quote.id)]).then(([nextShares, nextVersions]) => { setShares(nextShares); setVersions(nextVersions); }).catch(() => undefined));
+    queueMicrotask(() => Promise.all([loadQuoteShares(quote.id), loadQuoteVersions(quote.id), loadQuoteActivities(quote.id)]).then(([nextShares, nextVersions, nextActivities]) => { setShares(nextShares); setVersions(nextVersions); setActivities(nextActivities); }).catch(() => undefined));
   }, [quote.id]);
   const downloadPdf = async () => {
     setPdfLoading(true);
     try {
       await downloadQuotePdf(quote, customer, settings);
+      await logQuoteActivity(quote.id, "pdf_downloaded").catch(() => undefined);
+      setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "pdf_downloaded" }, ...current]);
     } finally {
       setPdfLoading(false);
     }
   };
   const shareQuote = async () => {
     setShareBusy(true); setShareError(""); setShareMessage("");
-    try { const share = await createQuoteShare({ quote, customer, settings }); const url = `${window.location.origin}/teklif/${share.token}`; await navigator.clipboard.writeText(url); setShares((current) => [share, ...current]); setShareMessage(`Salt-okunur teklif bağlantısı kopyalandı: ${url}`); }
+    try { const share = await createQuoteShare({ quote, customer, settings }); await logQuoteActivity(quote.id, "share_created").catch(() => undefined); const url = `${window.location.origin}/teklif/${share.token}`; await navigator.clipboard.writeText(url); setShares((current) => [share, ...current]); setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "share_created" }, ...current]); setShareMessage(`Salt-okunur teklif bağlantısı kopyalandı: ${url}`); }
     catch (caught) { setShareError(authErrorMessage(caught)); }
     finally { setShareBusy(false); }
   };
@@ -2251,6 +2271,7 @@ function QuoteDetail({
         </article>
         <aside className="activity panel">
           <h3>Teklif hareketleri</h3>
+          {activities.length > 0 && <div className="recorded-activities">{activities.slice(0, 6).map((activity) => <div key={activity.id}><i><Check /></i><span><b>{activity.type === "created" ? "Teklif kaydedildi" : activity.type === "pdf_downloaded" ? "PDF indirildi" : activity.type === "share_created" ? "Paylaşım bağlantısı oluşturuldu" : "Paylaşım bağlantısı iptal edildi"}</b><small>{activity.createdAt ? activity.createdAt.toDate().toLocaleString("tr-TR") : "Şimdi"}</small></span></div>)}</div>}
           <div className="timeline">
             <div className="done">
               <i>
@@ -2287,7 +2308,7 @@ function QuoteDetail({
             </div>
           </div>
           <hr />
-          {isFirebaseConfigured && <div className="quote-access-panel"><h4>Paylaşım ve sürümler</h4><p>{versions.length || 1} kayıtlı sürüm · {shares.filter((share) => share.active).length} aktif bağlantı</p>{editable && shares.filter((share) => share.active).map((share) => <button type="button" className="danger-link" key={share.token} onClick={async () => { await revokeQuoteShare(share.token); setShares((current) => current.map((item) => item.token === share.token ? { ...item, active: false } : item)); }}>Bağlantıyı iptal et · {share.expiresAt.toDate().toLocaleDateString("tr-TR")}</button>)}<small>Her kayıt işlemi değiştirilemez bir teklif sürümü oluşturur. Paylaşım bağlantıları 30 gün sonra kapanır.</small></div>}
+          {isFirebaseConfigured && <div className="quote-access-panel"><h4>Paylaşım ve sürümler</h4><p>{versions.length || 1} kayıtlı sürüm · {shares.filter((share) => share.active).length} aktif bağlantı</p>{editable && shares.filter((share) => share.active).map((share) => <button type="button" className="danger-link" key={share.token} onClick={async () => { await revokeQuoteShare(share.token); await logQuoteActivity(quote.id, "share_revoked").catch(() => undefined); setShares((current) => current.map((item) => item.token === share.token ? { ...item, active: false } : item)); setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "share_revoked" }, ...current]); }}>Bağlantıyı iptal et · {share.expiresAt.toDate().toLocaleDateString("tr-TR")}</button>)}<small>Her kayıt işlemi değiştirilemez bir teklif sürümü oluşturur. Paylaşım bağlantıları 30 gün sonra kapanır.</small></div>}
           <hr />
           <div className="meta-row">
             <CalendarDays />

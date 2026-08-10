@@ -53,6 +53,13 @@ test("organization deletion is an owner-only immutable request", () => {
   assert.match(rules, /allow update, delete: if false/);
 });
 
+test("quote activity records are organization-scoped and immutable", () => {
+  assert.match(rules, /match \/quoteActivities\/\{documentId\}/);
+  assert.match(rules, /request\.resource\.data\.actorId == request\.auth\.uid/);
+  assert.match(rules, /request\.resource\.data\.type in \['created', 'pdf_downloaded', 'share_created', 'share_revoked'\]/);
+  assert.match(rules, /allow update, delete: if false/);
+});
+
 test("OpenAI key stays server-side", () => {
   assert.match(aiRoute, /process\.env\.OPENAI_API_KEY/);
   assert.doesNotMatch(firebaseClient, /OPENAI_API_KEY/);

@@ -25,6 +25,7 @@ export type WorkspaceMember = { uid: string; organizationId: string; fullName: s
 export type WorkspaceInvitation = { id: string; organizationId: string; organizationName: string; email: string; role: Exclude<WorkspaceRole, "owner">; status: "pending" | "accepted" | "cancelled"; expiresAt: Timestamp };
 export type QuoteVersion = { id: string; quoteId: string; organizationId: string; createdBy: string; createdAt?: Timestamp; snapshot: WorkspaceQuote };
 export type QuoteShare = { token: string; quoteId: string; organizationId: string; active: boolean; expiresAt: Timestamp; quote: WorkspaceQuote; customer: WorkspaceCustomer; settings: WorkspaceSettings };
+export type QuoteActivity = { id: string; quoteId: string; organizationId: string; actorId: string; type: "created" | "pdf_downloaded" | "share_created" | "share_revoked"; createdAt?: Timestamp };
 
 async function getOrganizationId() {
   const services = getFirebaseServices();
@@ -215,12 +216,28 @@ export async function saveQuote(quote: WorkspaceQuote) {
     id: versionId, quoteId: quote.id, organizationId,
     createdBy: services.auth.currentUser?.uid ?? "", createdAt: serverTimestamp(), snapshot: quote,
   });
+  const activityId = `${organizationId}_${quote.id}_${crypto.randomUUID()}`;
+  batch.set(doc(services.db, "quoteActivities", activityId), { id: activityId, quoteId: quote.id, organizationId, actorId: services.auth.currentUser?.uid ?? "", type: "created", createdAt: serverTimestamp() });
   try {
     await batch.commit();
   } catch (error) {
     await deleteDoc(doc(services.db, "quotes", quoteDocumentId)).catch(() => undefined);
     throw error;
   }
+}
+
+export async function logQuoteActivity(quoteId: string, type: Exclude<QuoteActivity["type"], "created">) {
+  const services = getFirebaseServices(); const user = services?.auth.currentUser;
+  if (!services || !user) return;
+  const organizationId = await getOrganizationId(); const id = `${organizationId}_${quoteId}_${crypto.randomUUID()}`;
+  await setDoc(doc(services.db, "quoteActivities", id), { id, quoteId, organizationId, actorId: user.uid, type, createdAt: serverTimestamp() });
+}
+
+export async function loadQuoteActivities(quoteId: string) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const snapshot = await getDocs(query(collection(services.db, "quoteActivities"), where("organizationId", "==", organizationId), where("quoteId", "==", quoteId)));
+  return snapshot.docs.map((entry) => entry.data() as QuoteActivity).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 }
 
 export async function loadQuoteVersions(quoteId: string) {

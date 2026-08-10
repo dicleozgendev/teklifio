@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppErrorBoundary } from "@/components/app-error-boundary";
 
 export const metadata: Metadata = {
   title: "Teklifio — Profesyonel Teklif ve CRM",
@@ -12,7 +13,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="tr">
       <body>
-        {children}
+        <AppErrorBoundary>{children}</AppErrorBoundary>
         {demoMode && (
           <aside className="demo-environment" aria-label="Demo ortamı bilgilendirmesi">
             <strong>Demo Ortamı</strong>

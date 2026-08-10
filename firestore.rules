@@ -154,6 +154,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /quoteActivities/{documentId} {
+      allow read: if ownsExistingDocument();
+      allow create: if writesOwnOrganization()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.type in ['created', 'pdf_downloaded', 'share_created', 'share_revoked'];
+      allow update, delete: if false;
+    }
+
     match /quoteShares/{token} {
       allow get: if resource.data.active == true && request.time < resource.data.expiresAt;
       allow list: if hasWorkspace() && resource.data.organizationId == organizationId();
