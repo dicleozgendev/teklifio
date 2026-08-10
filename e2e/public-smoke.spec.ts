@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-test("demo shell, navigation, legal pages, and refresh work", async ({ page }) => {
+test("demo shell, navigation, legal pages, health, and refresh work", async ({ page, request }) => {
+  const healthResponse = await request.get("/api/health");
+  expect(healthResponse.ok()).toBe(true);
+  await expect(healthResponse.json()).resolves.toMatchObject({
+    status: "ok",
+    service: "teklifio",
+    environment: "development",
+  });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Günaydın/ })).toBeVisible();
   await expect(page.getByText("Demo Ortamı", { exact: true })).toBeVisible();

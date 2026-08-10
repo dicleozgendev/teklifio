@@ -11,13 +11,23 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
 
   static getDerivedStateFromError(): State { return { failed: true }; }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error & { digest?: string }) {
     try {
       const key = "teklifio-error-log";
       const current = JSON.parse(sessionStorage.getItem(key) ?? "[]") as unknown[];
       const safeEntry = { at: new Date().toISOString(), path: window.location.pathname, message: error.name || "ApplicationError" };
       sessionStorage.setItem(key, JSON.stringify([...current.slice(-19), safeEntry]));
     } catch { /* Kurtarma ekranı loglamadan da çalışır. */ }
+    void fetch("/api/client-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: error.name || "ApplicationError",
+        path: window.location.pathname,
+        digest: error.digest,
+      }),
+      keepalive: true,
+    }).catch(() => undefined);
   }
 
   render() {

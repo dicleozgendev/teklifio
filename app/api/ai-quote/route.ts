@@ -215,20 +215,38 @@ async function analyzeWithOpenAi(
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get("x-vercel-id") ?? undefined;
+  const respond = (body: AiQuoteApiResponse, status = 200, mode = "mock", reason?: string) => {
+    const entry = JSON.stringify({
+      level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
+      message: "ai_quote_request",
+      route: "/api/ai-quote",
+      requestId,
+      status,
+      mode,
+      reason,
+      durationMs: Date.now() - startedAt,
+    });
+    if (status >= 500) console.error(entry);
+    else if (status >= 400) console.warn(entry);
+    else console.log(entry);
+    return json(body, status, mode);
+  };
   const authorization = request.headers.get("authorization");
   const idToken = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
     : "";
-  if (!idToken) return json(emptyResponse(), 401);
+  if (!idToken) return respond(emptyResponse(), 401, "none", "missing_auth");
 
   let prompt = "";
   try {
     const body = (await request.json()) as { prompt?: unknown };
     prompt = typeof body.prompt === "string" ? body.prompt.trim().slice(0, 4000) : "";
   } catch {
-    return json(emptyResponse(), 400);
+    return respond(emptyResponse(), 400, "none", "invalid_json");
   }
-  if (!prompt) return json(emptyResponse(), 400);
+  if (!prompt) return respond(emptyResponse(), 400, "none", "empty_prompt");
 
   try {
     const context = await getFirebaseContext(idToken);
@@ -255,13 +273,18 @@ export async function POST(request: Request) {
     });
 
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey) return json(deterministicResponse(prompt, customers, products));
+    if (!apiKey) return respond(deterministicResponse(prompt, customers, products));
     try {
-      return json(await analyzeWithOpenAi(prompt, customers, products, apiKey), 200, "openai");
-    } catch {
-      return json(deterministicResponse(prompt, customers, products), 200, "mock-fallback");
+      return respond(await analyzeWithOpenAi(prompt, customers, products, apiKey), 200, "openai");
+    } catch (error) {
+      return respond(
+        deterministicResponse(prompt, customers, products),
+        200,
+        "mock-fallback",
+        error instanceof Error ? error.name : "UnknownError",
+      );
     }
   } catch {
-    return json(emptyResponse(), 401);
+    return respond(emptyResponse(), 401, "none", "invalid_workspace");
   }
 }

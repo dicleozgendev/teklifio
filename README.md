@@ -156,6 +156,8 @@ npm run test:all
 
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs the same unit, browser, lint, and production-build checks for pull requests and pushes to `main`. It uses the isolated local demo mode and requires no production credentials.
 
+The no-cost monitoring, health-check, incident, and backup-readiness procedures are documented in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
 ## Environment variables
 
 Copy `.env.example` to `.env.local` and replace every placeholder locally. Never commit `.env.local`.
