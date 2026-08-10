@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
+import { runtimeFlags } from "@/lib/runtime-config";
 
 export const metadata: Metadata = {
   title: "Teklifio — Profesyonel Teklif ve CRM",
@@ -9,12 +10,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
   return (
     <html lang="tr">
       <body>
         <AppErrorBoundary>{children}</AppErrorBoundary>
-        {demoMode && (
+        {runtimeFlags.demoMode && (
           <aside className="demo-environment" aria-label="Demo ortamı bilgilendirmesi">
             <strong>Demo Ortamı</strong>
             <span>Gösterilen şirket, müşteri, ürün ve finansal veriler kurgusaldır.</span>

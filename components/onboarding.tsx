@@ -41,7 +41,7 @@ export function Onboarding({
         <small>HOŞ GELDİNİZ</small>
         <h1 id="onboarding-title">{organizationName} çalışma alanı hazır</h1>
         <p>Tekliflerinizi doğru şirket bilgileri ve varsayılanlarla hazırlamak için iki kısa adımı tamamlayın.</p>
-        <ul><li><Check /> Kurgusal örnek verilerle başlayabilirsiniz</li><li><Check /> Ayarları daha sonra değiştirebilirsiniz</li><li><Check /> Kurulum sırasında ödeme alınmaz</li></ul>
+        <ul><li><Check /> İlk müşteri ve ürünlerinizi siz eklersiniz</li><li><Check /> Ayarları daha sonra değiştirebilirsiniz</li><li><Check /> Kurulum sırasında ödeme alınmaz</li></ul>
       </div>}
       {step === 1 && <div>
         <div className="section-title"><span><Building2 /></span><div><h3 id="onboarding-title">Şirket bilgileri</h3><p>Bu bilgiler teklif detayında ve PDF belgesinde görünür.</p></div></div>

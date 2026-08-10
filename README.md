@@ -139,6 +139,8 @@ Copy `.env.example` to `.env.local` and replace every placeholder locally. Never
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Browser | Firebase mode | Firebase web app ID |
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Browser | No | Optional Analytics measurement ID; Analytics is not required by the app |
 | `NEXT_PUBLIC_DEMO_MODE` | Browser | No | Shows the demo banner when set to `true` |
+| `NEXT_PUBLIC_SEED_DEMO_DATA` | Browser | No | Seeds fictional records only in development/staging when explicitly set to `true` |
+| `NEXT_PUBLIC_APP_ENV` | Browser | No | Runtime label: `development`, `staging`, or `production` |
 | `OPENAI_API_KEY` | Server only | No | Enables the OpenAI adapter; the deterministic parser remains available without it |
 
 Firebase web configuration is designed to be browser-visible. Access control must be enforced with Authentication and Firestore Security Rules, not by treating the web config as a secret.
@@ -181,6 +183,7 @@ When no key is configured—or the provider call fails—the server returns a de
 1. Import the repository into Vercel or deploy it with the Vercel CLI.
 2. Add all required `NEXT_PUBLIC_FIREBASE_*` variables to the intended environment.
 3. Set `NEXT_PUBLIC_DEMO_MODE=true` for a public demo, or `false` for a non-demo deployment.
+4. Set `NEXT_PUBLIC_APP_ENV=production` and `NEXT_PUBLIC_SEED_DEMO_DATA=false` for production. Demo seeding is automatically refused in production.
 4. Add `OPENAI_API_KEY` as a server-side environment variable. Do not expose it with a `NEXT_PUBLIC_` prefix.
 5. Deploy and verify registration, Firestore access, AI preview, quote persistence, and PDF download.
 6. Add the final Vercel domain to Firebase Authentication's authorized domains.
@@ -200,7 +203,9 @@ For responsible vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
 ## Demo notice
 
-The hosted demo may contain seeded, fictional records and example financial values. The demo label is controlled by `NEXT_PUBLIC_DEMO_MODE`. Demo content does not represent real customers, transactions, legal advice, accounting advice, or tax advice.
+The hosted demo may contain seeded, fictional records and example financial values. The demo label is controlled by `NEXT_PUBLIC_DEMO_MODE`; fictional record seeding is controlled separately by `NEXT_PUBLIC_SEED_DEMO_DATA` and is disabled in production. Demo content does not represent real customers, transactions, legal advice, accounting advice, or tax advice.
+
+For isolated preview testing, see [`docs/STAGING.md`](docs/STAGING.md). Never run automated account or data mutation tests against the production Firebase project.
 
 ## Limitations and roadmap
 

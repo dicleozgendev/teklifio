@@ -50,6 +50,7 @@ import {
 } from "@/lib/firebase/workspace";
 import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
 import { authErrorMessage, canEditWorkspaceData, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
+import { runtimeFlags } from "@/lib/runtime-config";
 import {
   ArrowLeft,
   ArrowRight,
@@ -454,6 +455,7 @@ export default function Home() {
         .then(async (data) => {
           if (data.profile.emailVerificationRequired && !currentUser.emailVerified) return data;
           if (
+            runtimeFlags.seedDemoData &&
             !data.customers.length &&
             !data.products.length &&
             !data.quotes.length
