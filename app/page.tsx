@@ -22,14 +22,20 @@ import {
   deleteProduct,
   completeWorkspaceOnboarding,
   cancelWorkspaceInvitation,
+  createQuoteShare,
   createWorkspaceInvitation,
   loadTeamMembers,
+  loadQuoteShares,
+  loadQuoteVersions,
   loadWorkspaceInvitations,
   loadWorkspaceData,
   saveCustomer,
   saveProduct,
   saveQuote,
   saveWorkspaceSettings,
+  revokeQuoteShare,
+  type QuoteShare,
+  type QuoteVersion,
   updateWorkspaceMember,
   type WorkspaceInvitation,
   type WorkspaceMember,
@@ -62,6 +68,7 @@ import {
   Plus,
   Search,
   Settings,
+  Share2,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -2062,6 +2069,15 @@ function QuoteDetail({
 }) {
   const totals = quoteTotals(quote.items);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
+  const [shareError, setShareError] = useState("");
+  const [shares, setShares] = useState<QuoteShare[]>([]);
+  const [versions, setVersions] = useState<QuoteVersion[]>([]);
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    queueMicrotask(() => Promise.all([loadQuoteShares(quote.id), loadQuoteVersions(quote.id)]).then(([nextShares, nextVersions]) => { setShares(nextShares); setVersions(nextVersions); }).catch(() => undefined));
+  }, [quote.id]);
   const downloadPdf = async () => {
     setPdfLoading(true);
     try {
@@ -2069,6 +2085,12 @@ function QuoteDetail({
     } finally {
       setPdfLoading(false);
     }
+  };
+  const shareQuote = async () => {
+    setShareBusy(true); setShareError(""); setShareMessage("");
+    try { const share = await createQuoteShare({ quote, customer, settings }); const url = `${window.location.origin}/teklif/${share.token}`; await navigator.clipboard.writeText(url); setShares((current) => [share, ...current]); setShareMessage(`Salt-okunur teklif bağlantısı kopyalandı: ${url}`); }
+    catch (caught) { setShareError(authErrorMessage(caught)); }
+    finally { setShareBusy(false); }
   };
   return (
     <>
@@ -2086,6 +2108,7 @@ function QuoteDetail({
           </div>
         </div>
         <div className="detail-actions">
+          {isFirebaseConfigured && <button className="secondary" onClick={shareQuote} disabled={shareBusy}><Share2 /> {shareBusy ? "Hazırlanıyor..." : "Paylaşım bağlantısı"}</button>}
           <button
             className="secondary"
             onClick={downloadPdf}
@@ -2095,6 +2118,8 @@ function QuoteDetail({
           </button>
         </div>
       </div>
+      {shareMessage && <div className="auth-success quote-share-message">{shareMessage}</div>}
+      {shareError && <div className="auth-error quote-share-message">{shareError}</div>}
       <div className="detail-grid">
         <article className="quote-paper">
           <div className="paper-brand">
@@ -2238,6 +2263,8 @@ function QuoteDetail({
               </span>
             </div>
           </div>
+          <hr />
+          {isFirebaseConfigured && <div className="quote-access-panel"><h4>Paylaşım ve sürümler</h4><p>{versions.length || 1} kayıtlı sürüm · {shares.filter((share) => share.active).length} aktif bağlantı</p>{shares.filter((share) => share.active).map((share) => <button type="button" className="danger-link" key={share.token} onClick={async () => { await revokeQuoteShare(share.token); setShares((current) => current.map((item) => item.token === share.token ? { ...item, active: false } : item)); }}>Bağlantıyı iptal et · {share.expiresAt.toDate().toLocaleDateString("tr-TR")}</button>)}<small>Her kayıt işlemi değiştirilemez bir teklif sürümü oluşturur. Paylaşım bağlantıları 30 gün sonra kapanır.</small></div>}
           <hr />
           <div className="meta-row">
             <CalendarDays />

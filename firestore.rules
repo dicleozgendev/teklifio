@@ -146,6 +146,28 @@ service cloud.firestore {
       allow update: if ownsExistingDocument() && writesOwnOrganization();
     }
 
+    match /quoteVersions/{documentId} {
+      allow read: if ownsExistingDocument();
+      allow create: if writesOwnOrganization()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.quoteId is string;
+      allow update, delete: if false;
+    }
+
+    match /quoteShares/{token} {
+      allow get: if resource.data.active == true && request.time < resource.data.expiresAt;
+      allow list: if hasWorkspace() && resource.data.organizationId == organizationId();
+      allow create: if writesOwnOrganization()
+        && request.resource.data.token == token
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.active == true
+        && request.resource.data.expiresAt > request.time;
+      allow update: if ownsExistingDocument() && writesOwnOrganization()
+        && request.resource.data.token == resource.data.token
+        && request.resource.data.quoteId == resource.data.quoteId;
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -2457,6 +2457,48 @@ textarea {
   .team-row { grid-template-columns: 1fr; align-items: stretch; }
   .team-row .secondary, .team-row select { width: 100%; }
 }
+.quote-share-message { margin: 0 0 18px; overflow-wrap: anywhere; }
+.quote-access-panel { display: grid; gap: 8px; }
+.quote-access-panel h4, .quote-access-panel p { margin: 0; }
+.quote-access-panel p, .quote-access-panel small { color: var(--muted); line-height: 1.5; }
+.quote-access-panel .danger-link { justify-self: start; }
+.shared-quote-page { min-height: 100vh; background: #f3f5f8; padding: 28px; color: #182230; }
+.shared-quote-toolbar { max-width: 1040px; margin: 0 auto 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.shared-quote-toolbar > div { display: grid; gap: 4px; }
+.shared-quote-toolbar span { display: flex; align-items: center; gap: 7px; font-weight: 750; }
+.shared-quote-toolbar span svg { width: 17px; color: #16814b; }
+.shared-quote-toolbar small { color: #687386; }
+.shared-quote-toolbar button { display: flex; align-items: center; gap: 7px; border: 0; border-radius: 10px; padding: 11px 16px; background: #1663e8; color: white; font-weight: 700; cursor: pointer; }
+.shared-quote-toolbar button svg { width: 17px; }
+.shared-quote-paper { max-width: 1040px; margin: auto; padding: 48px; border-radius: 16px; background: white; box-shadow: 0 14px 42px rgba(22,34,51,.08); }
+.shared-paper-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 32px; border-bottom: 1px solid #e5e9ef; }
+.shared-paper-head > div:last-child { display: grid; text-align: right; gap: 4px; }
+.shared-paper-head > div:last-child b { color: #1663e8; letter-spacing: .12em; }
+.shared-info { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; gap: 28px; padding: 30px 0; }
+.shared-info > div { display: grid; align-content: start; gap: 5px; }
+.shared-info small, .shared-bottom small { color: #8993a3; font-size: 10px; font-weight: 800; letter-spacing: .11em; }
+.shared-info span { color: #687386; font-size: 13px; }
+.shared-table-wrap { overflow-x: auto; }
+.shared-bottom { display: grid; grid-template-columns: 1fr 360px; gap: 36px; padding-top: 28px; }
+.shared-bottom p { line-height: 1.6; color: #4f5b6d; }
+.shared-quote-paper > footer { margin-top: 30px; padding-top: 18px; border-top: 1px solid #e5e9ef; color: #7b8595; font-size: 12px; }
+.shared-quote-state { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 24px; text-align: center; background: #f6f8fb; color: #182230; }
+.shared-quote-state > svg { width: 38px; height: 38px; color: #1663e8; }
+.shared-quote-state h1, .shared-quote-state p { margin: 0; }
+.shared-quote-state p { color: #687386; }
+@media (max-width: 720px) {
+  .shared-quote-page { padding: 14px; }
+  .shared-quote-toolbar { align-items: stretch; flex-direction: column; }
+  .shared-quote-toolbar button { justify-content: center; }
+  .shared-quote-paper { padding: 24px 18px; border-radius: 12px; }
+  .shared-info, .shared-bottom { grid-template-columns: 1fr; gap: 20px; }
+  .shared-paper-head { align-items: flex-start; }
+}
+@media print {
+  .shared-quote-page { background: white; padding: 0; }
+  .shared-quote-toolbar { display: none; }
+  .shared-quote-paper { box-shadow: none; max-width: none; padding: 0; }
+}
 .account-status-card { display: flex; align-items: center; gap: 11px; padding: 14px; border: 1px solid #e3e0ea; border-radius: 10px; background: #faf9fc; }
 .account-status-card > span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 9px; }
 .account-status-card > span.verified { background: #eaf8f2; color: #16845e; }

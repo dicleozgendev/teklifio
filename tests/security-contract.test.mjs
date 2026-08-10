@@ -37,6 +37,15 @@ test("only the owner can change another member while preserving organization ide
   assert.match(rules, /request\.resource\.data\.status in \['active', 'disabled'\]/);
 });
 
+test("shared quotes expose only expiring token reads and immutable versions", () => {
+  assert.match(rules, /match \/quoteShares\/\{token\}/);
+  assert.match(rules, /allow get: if resource\.data\.active == true && request\.time < resource\.data\.expiresAt/);
+  assert.match(rules, /allow list: if hasWorkspace\(\)/);
+  assert.doesNotMatch(rules, /match \/quoteShares[\s\S]*allow read: if true/);
+  assert.match(rules, /match \/quoteVersions\/\{documentId\}/);
+  assert.match(rules, /allow update, delete: if false/);
+});
+
 test("OpenAI key stays server-side", () => {
   assert.match(aiRoute, /process\.env\.OPENAI_API_KEY/);
   assert.doesNotMatch(firebaseClient, /OPENAI_API_KEY/);

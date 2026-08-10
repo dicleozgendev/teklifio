@@ -23,6 +23,8 @@ export type WorkspaceSettings = { companyName: string; address: string; phone: s
 export type WorkspaceProfile = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled"; emailVerificationRequired: boolean };
 export type WorkspaceMember = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled" };
 export type WorkspaceInvitation = { id: string; organizationId: string; organizationName: string; email: string; role: Exclude<WorkspaceRole, "owner">; status: "pending" | "accepted" | "cancelled"; expiresAt: Timestamp };
+export type QuoteVersion = { id: string; quoteId: string; organizationId: string; createdBy: string; createdAt?: Timestamp; snapshot: WorkspaceQuote };
+export type QuoteShare = { token: string; quoteId: string; organizationId: string; active: boolean; expiresAt: Timestamp; quote: WorkspaceQuote; customer: WorkspaceCustomer; settings: WorkspaceSettings };
 
 async function getOrganizationId() {
   const services = getFirebaseServices();
@@ -178,6 +180,7 @@ export async function saveQuote(quote: WorkspaceQuote) {
   const organizationId = await getOrganizationId();
   const batch = writeBatch(services.db);
   const quoteDocumentId = `${organizationId}_${quote.id}`;
+  const versionId = `${organizationId}_${quote.id}_${crypto.randomUUID()}`;
   batch.set(doc(services.db, "quotes", quoteDocumentId), {
     id: quote.id,
     organizationId,
@@ -198,10 +201,42 @@ export async function saveQuote(quote: WorkspaceQuote) {
       updatedAt: serverTimestamp(),
     });
   });
+  batch.set(doc(services.db, "quoteVersions", versionId), {
+    id: versionId, quoteId: quote.id, organizationId,
+    createdBy: services.auth.currentUser?.uid ?? "", createdAt: serverTimestamp(), snapshot: quote,
+  });
   try {
     await batch.commit();
   } catch (error) {
     await deleteDoc(doc(services.db, "quotes", quoteDocumentId)).catch(() => undefined);
     throw error;
   }
+}
+
+export async function loadQuoteVersions(quoteId: string) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const snapshot = await getDocs(query(collection(services.db, "quoteVersions"), where("organizationId", "==", organizationId), where("quoteId", "==", quoteId)));
+  return snapshot.docs.map((entry) => entry.data() as QuoteVersion).sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
+}
+
+export async function createQuoteShare(input: { quote: WorkspaceQuote; customer: WorkspaceCustomer; settings: WorkspaceSettings }) {
+  const services = getFirebaseServices(); const user = services?.auth.currentUser;
+  if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
+  const organizationId = await getOrganizationId(); const token = crypto.randomUUID();
+  const share: QuoteShare = { token, quoteId: input.quote.id, organizationId, active: true, expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000), quote: input.quote, customer: input.customer, settings: input.settings };
+  await setDoc(doc(services.db, "quoteShares", token), { ...share, createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  return share;
+}
+
+export async function loadQuoteShares(quoteId: string) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const snapshot = await getDocs(query(collection(services.db, "quoteShares"), where("organizationId", "==", organizationId), where("quoteId", "==", quoteId)));
+  return snapshot.docs.map((entry) => entry.data() as QuoteShare);
+}
+
+export async function revokeQuoteShare(token: string) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  await getOrganizationId(); await updateDoc(doc(services.db, "quoteShares", token), { active: false, updatedAt: serverTimestamp() });
 }
