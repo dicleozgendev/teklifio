@@ -2,9 +2,11 @@
 
 Use a separate Firebase project for staging. Do not point automated tests or preview deployments at the production Firestore database.
 
+The current staging project is `teklifio-staging-dic4`. Its Firestore rules and indexes are deployed, Email/Password Authentication is enabled, and Vercel Preview uses its separate Firebase web configuration. Keep actual configuration values in Vercel; do not copy them into this repository.
+
 ## Required separation
 
-- Create a dedicated Firebase project, for example `teklifio-staging`.
+- Create a dedicated Firebase project, for example `teklifio-staging` (already completed for the current deployment).
 - Enable Email/Password Authentication in that project.
 - Deploy `firestore.rules` and `firestore.indexes.json` to the staging project.
 - Configure a separate Vercel Preview environment with the staging Firebase web configuration.
@@ -34,3 +36,14 @@ npx firebase-tools deploy --only firestore --project YOUR_STAGING_PROJECT_ID
 ```
 
 Never commit `.env.local`, test passwords, Firebase service-account files, or OpenAI API keys.
+
+## Verified staging boundaries
+
+- Browser registration reaches the email-verification gate.
+- Registration creates the matching `organizations` and `users` documents.
+- An authenticated owner can write records only with its own `organizationId`.
+- A write carrying another `organizationId` is rejected by Firestore Security Rules.
+- Temporary acceptance-test accounts and documents must be deleted after each run.
+- Production Firebase data and production environment variables are never used by staging tests.
+
+Email verification must be completed through the mailbox link. Do not disable verification or weaken Firestore rules to bypass it in staging.

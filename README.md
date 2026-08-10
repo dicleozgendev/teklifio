@@ -36,7 +36,10 @@ The quote assistant accepts a natural-language request, matches only customers a
 - Modern, print-ready PDF generation with company, customer, line-item, total, note, and approval information
 - Firebase Authentication with email/password registration, verification, password reset, sign-in, sign-out, and session restoration
 - First-run onboarding and account-security settings
+- Team invitations with owner, administrator, member, and viewer roles
 - Organization-scoped Firestore data protected by Security Rules
+- Quote lifecycle statuses, immutable versions, activity history, and revocable read-only sharing links
+- Account data export and deletion-request workflow
 - Legal draft pages for privacy, KVKK disclosure, and terms of use
 - Environment-controlled demo notice
 
@@ -94,6 +97,11 @@ Firestore uses the following top-level collections:
 - `products`
 - `quotes`
 - `quoteItems`
+- `invitations`
+- `quoteVersions`
+- `quoteActivities`
+- `quoteShares`
+- `deletionRequests`
 
 Each business record carries an `organizationId`. The rules in `firestore.rules` require an authenticated user document and restrict reads and writes to that user's organization.
 
@@ -145,6 +153,8 @@ Run the complete local verification chain with:
 ```bash
 npm run test:all
 ```
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs the same unit, browser, lint, and production-build checks for pull requests and pushes to `main`. It uses the isolated local demo mode and requires no production credentials.
 
 ## Environment variables
 
@@ -205,9 +215,9 @@ When no key is configured—or the provider call fails—the server returns a de
 2. Add all required `NEXT_PUBLIC_FIREBASE_*` variables to the intended environment.
 3. Set `NEXT_PUBLIC_DEMO_MODE=true` for a public demo, or `false` for a non-demo deployment.
 4. Set `NEXT_PUBLIC_APP_ENV=production` and `NEXT_PUBLIC_SEED_DEMO_DATA=false` for production. Demo seeding is automatically refused in production.
-4. Add `OPENAI_API_KEY` as a server-side environment variable. Do not expose it with a `NEXT_PUBLIC_` prefix.
-5. Deploy and verify registration, Firestore access, AI preview, quote persistence, and PDF download.
-6. Add the final Vercel domain to Firebase Authentication's authorized domains.
+5. Add `OPENAI_API_KEY` as a server-side environment variable. Do not expose it with a `NEXT_PUBLIC_` prefix.
+6. Deploy and verify registration, Firestore access, AI preview, quote persistence, and PDF download.
+7. Add the final Vercel domain to Firebase Authentication's authorized domains.
 
 The standard Vercel build command is `npm run build`. No secret values are stored in `vercel.json`.
 
@@ -234,15 +244,19 @@ Currently implemented:
 
 - Email/password authentication, email verification, password reset, and one organization created during registration
 - First-run organization onboarding and a role-ready owner profile
+- Team invitations and owner/admin/member/viewer workspace roles
 - Organization-scoped CRM, catalog, quotes, PDF export, and AI-assisted draft generation
+- Quote sharing, lifecycle statuses, activity tracking, and immutable quote snapshots
+- Data export, deletion requests, and isolated automated browser/security tests
 - A deterministic Turkish parser fallback for a limited set of quote instructions
 
 Not currently implemented:
 
-- Team invitations and multi-role organization administration
 - Payment processing, subscriptions, and billing
 - Sending quotes by email or collecting legally binding e-signatures
-- Server-side PDF storage or version history
+- Server-side PDF file storage
+- Automated outbound email delivery and quote-view notifications
+- Managed production error monitoring, analytics, and scheduled backups
 - Full accounting, inventory, or tax-compliance automation
 - Broad conversational editing based on historical quotes
 
