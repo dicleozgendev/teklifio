@@ -54,6 +54,7 @@ import { runtimeFlags } from "@/lib/runtime-config";
 import {
   ArrowLeft,
   ArrowRight,
+  AlertTriangle,
   Bell,
   Box,
   Building2,
@@ -73,6 +74,7 @@ import {
   PackagePlus,
   Percent,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Share2,
@@ -569,7 +571,11 @@ export default function Home() {
     if (services) await firebaseSignOut(services.auth);
   };
 
-  if (authLoading || workspaceLoading) {
+  if (
+    authLoading ||
+    workspaceLoading ||
+    (isFirebaseConfigured && Boolean(currentUser) && !workspaceProfile && !syncError)
+  ) {
     return (
       <main className="app-loading">
         <div className="brand-mark"><FileText /></div>
@@ -579,6 +585,19 @@ export default function Home() {
     );
   }
   if (isFirebaseConfigured && !currentUser) return <AuthScreen />;
+  if (isFirebaseConfigured && currentUser && !workspaceProfile) {
+    return (
+      <main className="app-error-page" role="alert">
+        <AlertTriangle />
+        <h1>Çalışma alanı yüklenemedi</h1>
+        <p>{syncError || "Çalışma alanınız hazırlanırken beklenmeyen bir sorun oluştu."}</p>
+        <div>
+          <button type="button" onClick={() => window.location.reload()}><RefreshCw /> Tekrar dene</button>
+          <button type="button" onClick={() => void signOut()}>Farklı hesapla giriş yap</button>
+        </div>
+      </main>
+    );
+  }
   if (isFirebaseConfigured && currentUser && workspaceProfile?.emailVerificationRequired && !currentUser.emailVerified) {
     return <VerifyEmailScreen email={currentUser.email ?? workspaceProfile.email} />;
   }
