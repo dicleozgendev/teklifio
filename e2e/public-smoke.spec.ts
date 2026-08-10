@@ -25,4 +25,10 @@ test("demo shell, navigation, legal pages, health, and refresh work", async ({ p
   await expect(page.getByRole("heading", { name: /KVKK/ })).toBeVisible();
   await page.goto("/kullanim-kosullari");
   await expect(page.getByRole("heading", { name: "Kullanım Koşulları" })).toBeVisible();
+  await page.goto("/yardim");
+  await expect(page.getByRole("heading", { name: "İlk teklifinizi güvenle hazırlayın" })).toBeVisible();
+  await expect(page.getByText("Güvenli kullanım kontrol listesi")).toBeVisible();
+  await page.goto("/fiyatlandirma");
+  await expect(page.getByRole("heading", { name: "Şimdilik demo ve kontrollü pilot erişim" })).toBeVisible();
+  await expect(page.getByText("Ödeme sistemi aktif değil")).toBeVisible();
 });

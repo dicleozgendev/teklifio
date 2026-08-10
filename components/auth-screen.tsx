@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, Building2, CheckCircle2, FileText, LockKeyhole, Mail } from "lucide-react";
 import { loginWithEmail, registerWithInvitation, registerWithOrganization, requestPasswordReset } from "@/lib/firebase/auth";
 import { authErrorMessage } from "@/lib/auth-utils";
@@ -59,6 +60,7 @@ export function AuthScreen() {
           {success && <div className="auth-success">{success}</div>}
           <button className="primary auth-submit" disabled={loading}>{loading ? "Lütfen bekleyin..." : mode === "login" ? "Giriş Yap" : mode === "signup" ? "Hesap Oluştur" : "Bağlantı Gönder"}<ArrowRight /></button>
           {mode !== "reset" && !invitationId && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
+          <nav className="auth-public-links" aria-label="Bilgi bağlantıları"><Link href="/yardim">Yardım</Link><Link href="/fiyatlandirma">Fiyatlandırma</Link><Link href="/gizlilik">Gizlilik</Link></nav>
         </form>
       </section>
     </main>

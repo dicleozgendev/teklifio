@@ -2607,6 +2607,12 @@ textarea {
 .app-footer nav { display: flex; gap: 18px; }
 .app-footer a { color: #777283; text-decoration: none; }
 .app-footer a:hover { color: var(--primary); }
+.auth-public-links {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;
+  margin-top: 18px; padding-top: 16px; border-top: 1px solid #eceaf0;
+}
+.auth-public-links a { color: #777283; font-size: 9.5px; text-decoration: none; }
+.auth-public-links a:hover { color: var(--primary); }
 .ai-legal-warning {
   border-left: 3px solid #e0a12c; border-radius: 7px; background: #fff8e8;
   padding: 10px 12px; color: #72591f; font-size: 9.5px; line-height: 1.55;
@@ -2646,12 +2652,54 @@ textarea {
   margin-top: 25px; padding-top: 18px; border-top: 1px solid var(--line);
   color: #9793a0; font-size: 9.5px;
 }
+.public-info-page { min-height: 100vh; padding-bottom: 80px; background: linear-gradient(180deg,#f8f7fc,#f2f1f7); }
+.public-header-nav { display: flex; align-items: center; gap: 18px; }
+.public-header-nav a { color: #777283; font-size: 10.5px; font-weight: 650; text-decoration: none; }
+.public-header-nav a:hover { color: var(--primary); }
+.public-info-hero { width: min(1000px, calc(100% - 40px)); margin: 44px auto 32px; text-align: center; }
+.public-info-hero h1 { max-width: 760px; margin: 11px auto 0; font-size: clamp(30px, 5vw, 48px); letter-spacing: -1.6px; }
+.public-info-hero p { max-width: 680px; margin: 16px auto 0; color: #6f6b7a; font-size: 13px; line-height: 1.75; }
+.public-info-content { width: min(1080px, calc(100% - 30px)); margin: auto; }
+.guide-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.guide-card, .pricing-card, .help-panel, .faq-section, .pricing-faq {
+  border: 1px solid var(--line); border-radius: 16px; background: white; box-shadow: 0 14px 45px #25203c0a;
+}
+.guide-card { min-height: 230px; padding: 22px 18px; }
+.guide-card > span, .pricing-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; color: #6756e8; background: #f0edff; }
+.guide-card > span svg, .pricing-icon svg { width: 20px; }
+.guide-card small, .pricing-card small { display: block; margin-top: 20px; color: #796be3; font-size: 8.5px; font-weight: 800; letter-spacing: .7px; }
+.guide-card h2 { margin-top: 7px; font-size: 15px; line-height: 1.3; }
+.guide-card p, .pricing-card p, .pricing-faq p { margin-top: 9px; color: #6f6b7a; font-size: 10.5px; line-height: 1.65; }
+.help-panel { margin-top: 16px; padding: 28px 32px; }
+.help-panel > div { display: flex; align-items: center; gap: 10px; }
+.help-panel > div svg { color: #16845e; }
+.help-panel h2, .faq-section > h2, .pricing-faq h2 { font-size: 18px; }
+.help-panel ul { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px; margin: 20px 0 0; padding-left: 18px; }
+.help-panel li { color: #625e6b; font-size: 10.5px; line-height: 1.6; }
+.faq-section, .pricing-faq { margin-top: 16px; padding: 30px 32px; }
+.faq-section details { padding: 16px 0; border-bottom: 1px solid #eceaf0; }
+.faq-section details:last-child { border-bottom: 0; padding-bottom: 0; }
+.faq-section summary { color: #37323f; font-size: 11.5px; font-weight: 750; cursor: pointer; }
+.faq-section details p { margin-top: 9px; color: #6f6b7a; font-size: 10.5px; line-height: 1.7; }
+.pricing-notice { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 17px; padding: 12px; border: 1px solid #e8ddae; border-radius: 10px; background: #fffaf0; color: #695727; font-size: 10.5px; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.pricing-card { padding: 28px; }
+.pricing-card.featured { border-color: #cfc8fb; box-shadow: 0 18px 55px #5c49d519; }
+.pricing-card h2 { margin-top: 7px; font-size: 25px; }
+.pricing-card ul { min-height: 148px; display: flex; flex-direction: column; gap: 10px; margin: 24px 0; padding: 0; list-style: none; }
+.pricing-card li { display: flex; align-items: flex-start; gap: 8px; color: #5f5a68; font-size: 10.5px; line-height: 1.5; }
+.pricing-card li svg { width: 14px; flex: none; color: #16845e; }
+.pricing-card button { width: 100%; padding: 11px; border: 1px solid #dedbe7; border-radius: 9px; color: #777283; background: #f6f5f8; font-size: 10.5px; font-weight: 750; cursor: not-allowed; }
 @media (max-width: 800px) {
   .demo-environment { left: 12px; right: 12px; bottom: 10px; max-width: none; }
   .app-footer { padding: 0 18px 85px; gap: 15px; align-items: flex-start; }
   .app-footer nav { gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
   .legal-document { padding: 34px 25px; }
   .legal-document h1 { font-size: 28px; }
+  .guide-grid { grid-template-columns: 1fr 1fr; }
+  .guide-card:last-child { grid-column: 1 / -1; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .pricing-card ul { min-height: auto; }
 }
 @media (max-width: 560px) {
   .demo-environment { align-items: flex-start; }
@@ -2661,4 +2709,12 @@ textarea {
   .legal-header { height: 64px; padding: 0 16px; }
   .legal-document { margin-top: 10px; padding: 28px 19px; }
   .legal-document h1 { font-size: 25px; }
+  .public-header-nav > a:not(.legal-back) { display: none; }
+  .public-info-hero { margin-top: 24px; }
+  .guide-grid { grid-template-columns: 1fr; }
+  .guide-card:last-child { grid-column: auto; }
+  .guide-card { min-height: auto; }
+  .help-panel, .faq-section, .pricing-card, .pricing-faq { padding: 23px 20px; }
+  .help-panel ul { grid-template-columns: 1fr; }
+  .pricing-notice { align-items: flex-start; flex-direction: column; }
 }

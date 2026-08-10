@@ -865,6 +865,8 @@ export default function Home() {
         <footer className="app-footer">
           <span>© {new Date().getFullYear()} Teklifio</span>
           <nav aria-label="Hukuki bağlantılar">
+            <a href="/yardim">Yardım</a>
+            <a href="/fiyatlandirma">Fiyatlandırma</a>
             <a href="/gizlilik">Gizlilik</a>
             <a href="/kvkk">KVKK Aydınlatma Metni</a>
             <a href="/kullanim-kosullari">Kullanım Koşulları</a>

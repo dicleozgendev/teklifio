@@ -41,6 +41,7 @@ The quote assistant accepts a natural-language request, matches only customers a
 - Quote lifecycle statuses, immutable versions, activity history, and revocable read-only sharing links
 - Account data export and deletion-request workflow
 - Legal draft pages for privacy, KVKK disclosure, and terms of use
+- Public help center, onboarding guide, and non-transactional pricing status page
 - Environment-controlled demo notice
 
 ## AI-powered quote generation
@@ -157,6 +158,7 @@ npm run test:all
 The GitHub Actions workflow in `.github/workflows/ci.yml` runs the same unit, browser, lint, and production-build checks for pull requests and pushes to `main`. It uses the isolated local demo mode and requires no production credentials.
 
 The no-cost monitoring, health-check, incident, and backup-readiness procedures are documented in [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+Support intake and incident triage are documented in [`docs/SUPPORT.md`](docs/SUPPORT.md).
 
 ## Environment variables
 
