@@ -45,7 +45,7 @@ test("onboarding checklist and in-app support actions are functional", async ({ 
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
 
   await openNavigation();
-  await page.getByRole("button", { name: /Dashboard/ }).click();
+  await page.getByRole("button", { name: "Genel Bakış" }).click();
   await openNavigation();
   await page.getByRole("button", { name: "Yardım ve destek" }).click();
   const support = page.getByRole("dialog", { name: "Nasıl yardımcı olabiliriz?" });
