@@ -32,3 +32,31 @@ test("demo shell, navigation, legal pages, health, and refresh work", async ({ p
   await expect(page.getByRole("heading", { name: "Şimdilik demo ve kontrollü pilot erişim" })).toBeVisible();
   await expect(page.getByText("Ödeme sistemi aktif değil")).toBeVisible();
 });
+
+test("onboarding checklist and in-app support actions are functional", async ({ page }) => {
+  await page.goto("/");
+
+  const openNavigation = async () => {
+    const menu = page.getByRole("button", { name: "Menüyü aç" });
+    if (await menu.isVisible()) await menu.click();
+  };
+
+  await page.getByRole("button", { name: /Şirket bilgilerini tamamla/ }).click();
+  await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
+
+  await openNavigation();
+  await page.getByRole("button", { name: /Dashboard/ }).click();
+  await openNavigation();
+  await page.getByRole("button", { name: "Yardım ve destek" }).click();
+  const support = page.getByRole("dialog", { name: "Nasıl yardımcı olabiliriz?" });
+  await expect(support).toBeVisible();
+  await support.getByRole("button", { name: /Müşteri ekleyin/ }).click();
+  await expect(page.getByRole("heading", { name: "Yeni müşteri" })).toBeVisible();
+  await page.getByRole("button", { name: "Kapat" }).click();
+
+  await openNavigation();
+  await page.getByRole("button", { name: "Yardım ve destek" }).click();
+  await support.getByRole("button", { name: "Başlangıç rehberini tekrar aç" }).click();
+  await expect(page.getByRole("dialog", { name: /çalışma alanı hazır/ })).toBeVisible();
+  await page.getByRole("button", { name: "Başlangıç rehberini kapat" }).click();
+});

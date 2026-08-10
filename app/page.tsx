@@ -6,6 +6,7 @@ import type { User } from "firebase/auth";
 import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { AuthScreen } from "@/components/auth-screen";
 import { Onboarding } from "@/components/onboarding";
+import { SupportPanel } from "@/components/support-panel";
 import { VerifyEmailScreen } from "@/components/verify-email-screen";
 import { downloadQuotePdf } from "@/lib/quote-pdf";
 import {
@@ -67,6 +68,7 @@ import {
   Clock3,
   FileText,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Mail,
   Menu,
@@ -381,6 +383,8 @@ export default function Home() {
   const [workspaceProfile, setWorkspaceProfile] = useState<WorkspaceProfile | null>(null);
   const [organizationName, setOrganizationName] = useState("Çalışma alanı");
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
+  const [onboardingReplayOpen, setOnboardingReplayOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
@@ -516,6 +520,8 @@ export default function Home() {
         setProfileOpen(false);
         setNotificationsOpen(false);
         setSearchOpen(false);
+        setSupportOpen(false);
+        setOnboardingReplayOpen(false);
       }
     };
     window.addEventListener("keydown", keyboard);
@@ -561,7 +567,7 @@ export default function Home() {
 
   const finishOnboarding = async (next: WorkspaceSettings) => {
     await updateSettings(next);
-    await completeWorkspaceOnboarding();
+    if (isFirebaseConfigured) await completeWorkspaceOnboarding();
     setOnboardingCompleted(true);
   };
 
@@ -641,9 +647,25 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      {isFirebaseConfigured && currentUser && !onboardingCompleted && (
-        <Onboarding organizationName={organizationName} settings={settings} onComplete={finishOnboarding} />
+      {((isFirebaseConfigured && currentUser && !onboardingCompleted) || onboardingReplayOpen) && (
+        <Onboarding
+          organizationName={organizationName}
+          settings={settings}
+          onDismiss={onboardingCompleted ? () => setOnboardingReplayOpen(false) : undefined}
+          onComplete={async (next) => { await finishOnboarding(next); setOnboardingReplayOpen(false); }}
+        />
       )}
+      {supportOpen && <SupportPanel
+        editable={mayEdit}
+        onClose={() => setSupportOpen(false)}
+        onReplayOnboarding={() => setOnboardingReplayOpen(true)}
+        onNavigate={(action) => {
+          if (action === "settings") go("settings");
+          if (action === "customers") { if (mayEdit) { setQuickCreate("customer"); setQuickCreateKey((key) => key + 1); } go("customers"); }
+          if (action === "products") { if (mayEdit) { setQuickCreate("product"); setQuickCreateKey((key) => key + 1); } go("products"); }
+          if (action === "new-quote") go(mayEdit ? "new-quote" : "quotes");
+        }}
+      />}
       {mobileOpen && (
         <button
           className="scrim"
@@ -689,6 +711,10 @@ export default function Home() {
           >
             <Settings size={19} />
             <span>Ayarlar</span>
+          </button>
+          <button onClick={() => { setSupportOpen(true); setMobileOpen(false); }}>
+            <LifeBuoy size={19} />
+            <span>Yardım ve destek</span>
           </button>
         </nav>
         {mayEdit && <div className="sidebar-help">
@@ -811,6 +837,7 @@ export default function Home() {
               onQuotes={() => go("quotes")}
               onCustomer={() => { setQuickCreate("customer"); setQuickCreateKey((key) => key + 1); go("customers"); }}
               onProduct={() => { setQuickCreate("product"); setQuickCreateKey((key) => key + 1); go("products"); }}
+              onSettings={() => go("settings")}
               editable={mayEdit}
             />
           )}
@@ -910,6 +937,7 @@ function Dashboard({
   onQuotes,
   onCustomer,
   onProduct,
+  onSettings,
   editable,
 }: {
   customers: Customer[];
@@ -921,16 +949,17 @@ function Dashboard({
   onQuotes: () => void;
   onCustomer: () => void;
   onProduct: () => void;
+  onSettings: () => void;
   editable: boolean;
 }) {
   const approved = quotes
     .filter((q) => q.status === "Onaylandı")
     .reduce((s, q) => s + quoteTotals(q.items).total, 0);
   const setupSteps = [
-    { label: "Şirket bilgilerini tamamla", done: Boolean(settings.companyName.trim() && settings.email.trim()) },
-    { label: "İlk müşterini ekle", done: customers.length > 0 },
-    { label: "Ürün veya hizmet ekle", done: products.length > 0 },
-    { label: "İlk teklifini oluştur", done: quotes.length > 0 },
+    { label: "Şirket bilgilerini tamamla", done: Boolean(settings.companyName.trim() && settings.email.trim()), action: onSettings },
+    { label: "İlk müşterini ekle", done: customers.length > 0, action: onCustomer },
+    { label: "Ürün veya hizmet ekle", done: products.length > 0, action: onProduct },
+    { label: "İlk teklifini oluştur", done: quotes.length > 0, action: onNew },
   ];
   const completedSetup = setupSteps.filter((item) => item.done).length;
   return (
@@ -979,7 +1008,7 @@ function Dashboard({
           detail="bu ay"
         />
       </section>
-      <section className="panel setup-checklist"><div><span className="eyebrow">BAŞLANGIÇ KONTROLÜ</span><h3>Çalışma alanı kurulumu</h3><p>{completedSetup}/4 adım tamamlandı</p></div><div>{setupSteps.map((item) => <span className={item.done ? "done" : ""} key={item.label}>{item.done ? <CheckCircle2 /> : <Clock3 />}{item.label}</span>)}</div></section>
+      <section className="panel setup-checklist"><div><span className="eyebrow">BAŞLANGIÇ KONTROLÜ</span><h3>Çalışma alanı kurulumu</h3><p>{completedSetup}/4 adım tamamlandı</p></div><div>{setupSteps.map((item) => <button className={item.done ? "done" : ""} key={item.label} onClick={item.action}>{item.done ? <CheckCircle2 /> : <Clock3 />}<span>{item.label}</span><ArrowRight /></button>)}</div></section>
       <section className="dashboard-grid">
         <div className="panel chart-panel">
           <div className="panel-head">

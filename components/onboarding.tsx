@@ -8,10 +8,12 @@ export function Onboarding({
   organizationName,
   settings,
   onComplete,
+  onDismiss,
 }: {
   organizationName: string;
   settings: WorkspaceSettings;
   onComplete: (settings: WorkspaceSettings) => Promise<void>;
+  onDismiss?: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(settings);
@@ -33,6 +35,7 @@ export function Onboarding({
 
   return <div className="onboarding-wrap" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
     <section className="onboarding-card">
+      {onDismiss && <button className="onboarding-close" aria-label="Başlangıç rehberini kapat" onClick={onDismiss}>×</button>}
       <div className="onboarding-progress" aria-label={`Kurulum adımı ${step + 1} / 3`}>
         {[0, 1, 2].map((item) => <i key={item} className={item <= step ? "active" : ""} />)}
       </div>
