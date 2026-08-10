@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Building2, CheckCircle2, FileText, LockKeyhole, Mail } from "lucide-react";
-import { loginWithEmail, registerWithOrganization, requestPasswordReset } from "@/lib/firebase/auth";
+import { loginWithEmail, registerWithInvitation, registerWithOrganization, requestPasswordReset } from "@/lib/firebase/auth";
 import { authErrorMessage } from "@/lib/auth-utils";
 
 export function AuthScreen() {
@@ -14,6 +14,11 @@ export function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [invitationId, setInvitationId] = useState("");
+  useEffect(() => {
+    const invite = new URLSearchParams(window.location.search).get("invite");
+    if (invite) queueMicrotask(() => { setInvitationId(invite); setMode("signup"); });
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -21,6 +26,7 @@ export function AuthScreen() {
     setError("");
     try {
       if (mode === "login") await loginWithEmail(email, password);
+      else if (mode === "signup" && invitationId) await registerWithInvitation({ invitationId, email, password, fullName });
       else if (mode === "signup") await registerWithOrganization({ email, password, fullName, organizationName });
       else {
         await requestPasswordReset(email);
@@ -43,16 +49,16 @@ export function AuthScreen() {
         <form className="auth-card" onSubmit={submit}>
           <div className="auth-mobile-brand"><FileText /> teklifio</div>
           {mode === "reset" && <button type="button" className="auth-back" onClick={() => { setMode("login"); setError(""); setSuccess(""); }}><ArrowLeft /> Girişe dön</button>}
-          <h2>{mode === "login" ? "Tekrar hoş geldiniz" : mode === "signup" ? "Çalışma alanınızı oluşturun" : "Şifrenizi sıfırlayın"}</h2>
-          <p>{mode === "login" ? "Teklifio hesabınıza giriş yapın." : mode === "signup" ? "İşletmeniz için güvenli bir hesap oluşturun." : "Hesabınıza bağlı e-posta adresine güvenli bir bağlantı gönderelim."}</p>
-          {mode === "signup" && <><label>Ad soyad<div className="auth-input"><Mail /><input value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div></label><label>Şirket / çalışma alanı<div className="auth-input"><Building2 /><input value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required /></div></label></>}
+          <h2>{mode === "login" ? "Tekrar hoş geldiniz" : mode === "signup" ? invitationId ? "Ekip davetini kabul edin" : "Çalışma alanınızı oluşturun" : "Şifrenizi sıfırlayın"}</h2>
+          <p>{mode === "login" ? "Teklifio hesabınıza giriş yapın." : mode === "signup" ? invitationId ? "Davet edilen e-posta adresinizle güvenli hesabınızı oluşturun." : "İşletmeniz için güvenli bir hesap oluşturun." : "Hesabınıza bağlı e-posta adresine güvenli bir bağlantı gönderelim."}</p>
+          {mode === "signup" && <><label>Ad soyad<div className="auth-input"><Mail /><input value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div></label>{!invitationId && <label>Şirket / çalışma alanı<div className="auth-input"><Building2 /><input value={organizationName} onChange={(e) => setOrganizationName(e.target.value)} required /></div></label>}</>}
           <label>E-posta<div className="auth-input"><Mail /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div></label>
           {mode !== "reset" && <label>Şifre<div className="auth-input"><LockKeyhole /><input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete={mode === "login" ? "current-password" : "new-password"} /></div></label>}
           {mode === "login" && <button type="button" className="forgot-password" onClick={() => { setMode("reset"); setError(""); setSuccess(""); }}>Şifremi unuttum</button>}
           {error && <div className="auth-error">{error}</div>}
           {success && <div className="auth-success">{success}</div>}
           <button className="primary auth-submit" disabled={loading}>{loading ? "Lütfen bekleyin..." : mode === "login" ? "Giriş Yap" : mode === "signup" ? "Hesap Oluştur" : "Bağlantı Gönder"}<ArrowRight /></button>
-          {mode !== "reset" && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
+          {mode !== "reset" && !invitationId && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
         </form>
       </section>
     </main>

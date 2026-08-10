@@ -7,6 +7,8 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  Timestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -18,7 +20,9 @@ export type WorkspaceProduct = { id: number; name: string; code: string; type: "
 export type WorkspaceQuoteItem = { id: number; productId: number; name: string; qty: number; price: number; discount: number; vat: number };
 export type WorkspaceQuote = { id: string; customerId: number; date: string; validUntil: string; status: "Taslak" | "Gönderildi" | "Onaylandı"; items: WorkspaceQuoteItem[]; note: string; currency?: string };
 export type WorkspaceSettings = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; validityDays: number; quotePrefix: string; currency: string; defaultNote: string; footerText: string; vatRates: number[]; defaultVat: number };
-export type WorkspaceProfile = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; emailVerificationRequired: boolean };
+export type WorkspaceProfile = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled"; emailVerificationRequired: boolean };
+export type WorkspaceMember = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled" };
+export type WorkspaceInvitation = { id: string; organizationId: string; organizationName: string; email: string; role: Exclude<WorkspaceRole, "owner">; status: "pending" | "accepted" | "cancelled"; expiresAt: Timestamp };
 
 async function getOrganizationId() {
   const services = getFirebaseServices();
@@ -27,7 +31,10 @@ async function getOrganizationId() {
   const userRef = doc(services.db, "users", user.uid);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const snapshot = await getDoc(userRef);
-    if (snapshot.exists()) return snapshot.data().organizationId as string;
+    if (snapshot.exists()) {
+      if (snapshot.data().status === "disabled") throw new Error("Hesabınız bu çalışma alanında devre dışı bırakılmış.");
+      return snapshot.data().organizationId as string;
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 250));
   }
   throw new Error("Kullanıcı çalışma alanı bulunamadı.");
@@ -64,6 +71,7 @@ export async function loadWorkspaceData() {
     fullName: String(profileData?.fullName ?? user.displayName ?? ""),
     email: String(profileData?.email ?? user.email ?? ""),
     role: normalizeWorkspaceRole(profileData?.role),
+    status: profileData?.status === "disabled" ? "disabled" : "active",
     emailVerificationRequired: profileData?.emailVerificationRequired === true,
   };
   const organizationData = organization.data();
@@ -78,6 +86,41 @@ export async function loadWorkspaceData() {
       : true,
     profile,
   };
+}
+
+export async function loadTeamMembers() {
+  const services = getFirebaseServices();
+  if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const snapshot = await getDocs(query(collection(services.db, "users"), where("organizationId", "==", organizationId)));
+  return snapshot.docs.map((entry) => { const data = entry.data(); return { uid: entry.id, organizationId, fullName: String(data.fullName ?? ""), email: String(data.email ?? ""), role: normalizeWorkspaceRole(data.role), status: data.status === "disabled" ? "disabled" as const : "active" as const }; });
+}
+
+export async function loadWorkspaceInvitations() {
+  const services = getFirebaseServices();
+  if (!services) throw new Error("Firebase yapılandırılmadı.");
+  const organizationId = await getOrganizationId();
+  const snapshot = await getDocs(query(collection(services.db, "invitations"), where("organizationId", "==", organizationId)));
+  return snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() } as WorkspaceInvitation));
+}
+
+export async function createWorkspaceInvitation(input: { email: string; role: Exclude<WorkspaceRole, "owner">; organizationName: string }) {
+  const services = getFirebaseServices(); const user = services?.auth.currentUser;
+  if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
+  const organizationId = await getOrganizationId(); const id = crypto.randomUUID();
+  const invitation: WorkspaceInvitation = { id, organizationId, organizationName: input.organizationName, email: input.email.trim().toLocaleLowerCase("tr-TR"), role: input.role, status: "pending", expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000) };
+  await setDoc(doc(services.db, "invitations", id), { ...invitation, createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  return invitation;
+}
+
+export async function updateWorkspaceMember(uid: string, values: { role?: Exclude<WorkspaceRole, "owner">; status?: "active" | "disabled" }) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  await getOrganizationId(); await updateDoc(doc(services.db, "users", uid), { ...values, updatedAt: serverTimestamp() });
+}
+
+export async function cancelWorkspaceInvitation(id: string) {
+  const services = getFirebaseServices(); if (!services) throw new Error("Firebase yapılandırılmadı.");
+  await getOrganizationId(); await updateDoc(doc(services.db, "invitations", id), { status: "cancelled", updatedAt: serverTimestamp() });
 }
 
 export async function completeWorkspaceOnboarding() {

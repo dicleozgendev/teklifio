@@ -25,5 +25,14 @@ export function authErrorMessage(error: unknown) {
   if (code === "auth/network-request-failed") return "Firebase ağına ulaşılamadı. İnternet bağlantısını kontrol edin.";
   if (code === "permission-denied") return "Firestore erişimi reddedildi. Güvenlik kurallarını kontrol edin.";
   if (code === "unavailable") return "Firebase servisine şu anda ulaşılamıyor. Lütfen kısa süre sonra tekrar deneyin.";
+  const safeMessages = [
+    "Davet bağlantısı bulunamadı veya erişim izniniz yok.",
+    "Bu davet daha önce kullanılmış veya iptal edilmiş.",
+    "Bu davet farklı bir e-posta adresi için oluşturulmuş.",
+    "Bu davetin süresi dolmuş.",
+    "Davet rolü geçerli değil.",
+    "Hesabınız bu çalışma alanında devre dışı bırakılmış.",
+  ];
+  if (error instanceof Error && safeMessages.includes(error.message)) return error.message;
   return "İşlem tamamlanamadı. Lütfen tekrar deneyin.";
 }

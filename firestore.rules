@@ -11,7 +11,8 @@ service cloud.firestore {
     }
 
     function hasWorkspace() {
-      return signedIn() && exists(userPath());
+      return signedIn() && exists(userPath())
+        && (!('status' in get(userPath()).data) || get(userPath()).data.status == 'active');
     }
 
     function organizationId() {
@@ -23,21 +24,29 @@ service cloud.firestore {
     }
 
     function writesOwnOrganization() {
-      return hasWorkspace() && request.resource.data.organizationId == organizationId();
+      return hasWorkspace() && currentRole() != 'viewer'
+        && request.resource.data.organizationId == organizationId();
+    }
+
+    function canDeleteExistingDocument() {
+      return ownsExistingDocument() && currentRole() != 'viewer';
     }
 
     function validRole(role) {
       return role in ['owner', 'admin', 'member', 'viewer'];
     }
 
+    function currentRole() { return get(userPath()).data.role; }
+    function isOwner() { return hasWorkspace() && currentRole() == 'owner'; }
+    function isManager() { return hasWorkspace() && currentRole() in ['owner', 'admin']; }
+
     match /organizations/{orgId} {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid;
       allow read: if hasWorkspace() && orgId == organizationId();
-      allow update: if hasWorkspace()
+      allow update: if isManager()
         && orgId == organizationId()
-        && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == request.auth.uid;
+        && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if hasWorkspace()
         && orgId == organizationId()
         && resource.data.ownerId == request.auth.uid;
@@ -47,39 +56,92 @@ service cloud.firestore {
       allow create: if signedIn()
         && userId == request.auth.uid
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.role == 'owner'
         && request.resource.data.emailVerificationRequired == true
-        && getAfter(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid;
-      allow read: if signedIn() && userId == request.auth.uid;
-      allow update: if signedIn()
+        && request.resource.data.status == 'active'
+        && ((request.resource.data.role == 'owner'
+          && getAfter(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid)
+        || (request.resource.data.role in ['admin', 'member', 'viewer']
+          && request.resource.data.inviteId is string
+          && exists(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId))
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.status == 'pending'
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.organizationId == request.resource.data.organizationId
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.role == request.resource.data.role
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.email == request.resource.data.email
+          && request.auth.token.email == request.resource.data.email
+          && request.time < get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.expiresAt));
+      allow read: if signedIn() && (userId == request.auth.uid
+        || (isManager() && resource.data.organizationId == organizationId()));
+      allow update: if (signedIn()
         && userId == request.auth.uid
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.organizationId == resource.data.organizationId
         && request.resource.data.role == resource.data.role
-        && validRole(request.resource.data.role);
+        && request.resource.data.status == resource.data.status
+        && validRole(request.resource.data.role))
+        || (isOwner()
+          && userId != request.auth.uid
+          && resource.data.organizationId == organizationId()
+          && resource.data.role != 'owner'
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.organizationId == resource.data.organizationId
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role in ['admin', 'member', 'viewer']
+          && request.resource.data.status in ['active', 'disabled']);
+      allow delete: if false;
+    }
+
+    match /invitations/{invitationId} {
+      allow create: if isManager()
+        && request.resource.data.id == invitationId
+        && request.resource.data.organizationId == organizationId()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role in ['admin', 'member', 'viewer']
+        && request.resource.data.email is string
+        && request.resource.data.expiresAt > request.time;
+      allow read: if (isManager() && resource.data.organizationId == organizationId())
+        || (signedIn() && request.auth.token.email == resource.data.email);
+      allow update: if (isManager()
+          && resource.data.organizationId == organizationId()
+          && request.resource.data.organizationId == resource.data.organizationId
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role)
+        || (signedIn()
+          && request.auth.token.email == resource.data.email
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.acceptedBy == request.auth.uid
+          && request.resource.data.organizationId == resource.data.organizationId
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role
+          && request.time < resource.data.expiresAt);
       allow delete: if false;
     }
 
     match /customers/{documentId} {
-      allow read, delete: if ownsExistingDocument();
+      allow read: if ownsExistingDocument();
+      allow delete: if canDeleteExistingDocument();
       allow create: if writesOwnOrganization();
       allow update: if ownsExistingDocument() && writesOwnOrganization();
     }
 
     match /products/{documentId} {
-      allow read, delete: if ownsExistingDocument();
+      allow read: if ownsExistingDocument();
+      allow delete: if canDeleteExistingDocument();
       allow create: if writesOwnOrganization();
       allow update: if ownsExistingDocument() && writesOwnOrganization();
     }
 
     match /quotes/{documentId} {
-      allow read, delete: if ownsExistingDocument();
+      allow read: if ownsExistingDocument();
+      allow delete: if canDeleteExistingDocument();
       allow create: if writesOwnOrganization();
       allow update: if ownsExistingDocument() && writesOwnOrganization();
     }
 
     match /quoteItems/{documentId} {
-      allow read, delete: if ownsExistingDocument();
+      allow read: if ownsExistingDocument();
+      allow delete: if canDeleteExistingDocument();
       allow create: if writesOwnOrganization();
       allow update: if ownsExistingDocument() && writesOwnOrganization();
     }

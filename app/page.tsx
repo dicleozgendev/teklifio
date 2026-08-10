@@ -21,16 +21,23 @@ import {
   deleteCustomer,
   deleteProduct,
   completeWorkspaceOnboarding,
+  cancelWorkspaceInvitation,
+  createWorkspaceInvitation,
+  loadTeamMembers,
+  loadWorkspaceInvitations,
   loadWorkspaceData,
   saveCustomer,
   saveProduct,
   saveQuote,
   saveWorkspaceSettings,
+  updateWorkspaceMember,
+  type WorkspaceInvitation,
+  type WorkspaceMember,
   type WorkspaceProfile,
   type WorkspaceSettings,
 } from "@/lib/firebase/workspace";
 import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
-import { authErrorMessage } from "@/lib/auth-utils";
+import { authErrorMessage, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
 import {
   ArrowLeft,
   ArrowRight,
@@ -798,7 +805,7 @@ export default function Home() {
               onBack={() => go("quotes")}
             />
           )}
-          {screen === "settings" && <SettingsPage settings={settings} onSave={updateSettings} currentUser={currentUser} profile={workspaceProfile} onAccountNameChange={async (fullName) => { await updateAccountName(fullName); setWorkspaceProfile((current) => current ? { ...current, fullName } : current); }} />}
+          {screen === "settings" && <SettingsPage settings={settings} organizationName={organizationName} onSave={updateSettings} currentUser={currentUser} profile={workspaceProfile} onAccountNameChange={async (fullName) => { await updateAccountName(fullName); setWorkspaceProfile((current) => current ? { ...current, fullName } : current); }} />}
         </div>
         {searchRecord?.kind === "customer" && <Modal title={searchRecord.record.company} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Yetkili:</b> {searchRecord.record.name || "Belirtilmedi"}</p><p><b>E-posta:</b> {searchRecord.record.email || "Belirtilmedi"}</p><p><b>Telefon:</b> {searchRecord.record.phone || "Belirtilmedi"}</p><p><b>Adres:</b> {searchRecord.record.address || "Belirtilmedi"}</p><p><b>Vergi:</b> {[searchRecord.record.taxOffice, searchRecord.record.taxNumber].filter(Boolean).join(" · ") || "Belirtilmedi"}</p><p><b>Not:</b> {searchRecord.record.notes || "Belirtilmedi"}</p></div></Modal>}
         {searchRecord?.kind === "product" && <Modal title={searchRecord.record.name} onClose={() => setSearchRecord(null)}><div className="record-detail"><p><b>Kod:</b> {searchRecord.record.code || "Belirtilmedi"}</p><p><b>Tür:</b> {searchRecord.record.type}</p><p><b>Birim:</b> {searchRecord.record.unit}</p><p><b>Birim fiyat:</b> {currency(searchRecord.record.price)}</p><p><b>Varsayılan KDV:</b> %{searchRecord.record.vat}</p><p><b>Açıklama:</b> {searchRecord.record.description || "Belirtilmedi"}</p></div></Modal>}
@@ -2251,14 +2258,30 @@ function QuoteDetail({
   );
 }
 
-function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameChange }: { settings: WorkspaceSettings; onSave: (settings: WorkspaceSettings) => Promise<void>; currentUser: User | null; profile: WorkspaceProfile | null; onAccountNameChange: (fullName: string) => Promise<void> }) {
-  const [section, setSection] = useState<"company" | "quote" | "tax" | "account">("company");
+function SettingsPage({ settings, organizationName, onSave, currentUser, profile, onAccountNameChange }: { settings: WorkspaceSettings; organizationName: string; onSave: (settings: WorkspaceSettings) => Promise<void>; currentUser: User | null; profile: WorkspaceProfile | null; onAccountNameChange: (fullName: string) => Promise<void> }) {
+  const [section, setSection] = useState<"company" | "quote" | "tax" | "team" | "account">("company");
   const [form, setForm] = useState(settings);
   const [saved, setSaved] = useState(false);
   const [accountName, setAccountName] = useState(profile?.fullName || currentUser?.displayName || "");
   const [accountBusy, setAccountBusy] = useState<"profile" | "verification" | "password" | null>(null);
   const [accountMessage, setAccountMessage] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [invitations, setInvitations] = useState<WorkspaceInvitation[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Exclude<WorkspaceRole, "owner">>("member");
+  const [teamBusy, setTeamBusy] = useState(false);
+  const [teamMessage, setTeamMessage] = useState("");
+  const [teamError, setTeamError] = useState("");
+  const refreshTeam = async () => { const [nextMembers, nextInvitations] = await Promise.all([loadTeamMembers(), loadWorkspaceInvitations()]); setMembers(nextMembers); setInvitations(nextInvitations); };
+  useEffect(() => { if (section === "team" && profile && canManageWorkspace(profile.role)) queueMicrotask(() => refreshTeam().catch((error: Error) => setTeamError(error.message))); }, [section, profile]);
+  const inviteMember = async () => {
+    setTeamBusy(true); setTeamError(""); setTeamMessage("");
+    try { const invitation = await createWorkspaceInvitation({ email: inviteEmail, role: inviteRole, organizationName }); const link = `${window.location.origin}/?invite=${invitation.id}`; await navigator.clipboard.writeText(link); setInviteEmail(""); setTeamMessage(`Davet bağlantısı kopyalandı: ${link}`); await refreshTeam(); }
+    catch (caught) { setTeamError(authErrorMessage(caught)); }
+    finally { setTeamBusy(false); }
+  };
+  const changeMember = async (uid: string, values: { role?: Exclude<WorkspaceRole, "owner">; status?: "active" | "disabled" }) => { setTeamBusy(true); setTeamError(""); try { await updateWorkspaceMember(uid, values); await refreshTeam(); setTeamMessage("Ekip üyesi güncellendi."); } catch (caught) { setTeamError(authErrorMessage(caught)); } finally { setTeamBusy(false); } };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const vatRates = [...new Set(form.vatRates.map(Number))].filter((rate) => Number.isFinite(rate) && rate >= 0 && rate <= 100).sort((a, b) => a - b);
@@ -2289,6 +2312,9 @@ function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameCha
           <button className={section === "tax" ? "active" : ""} onClick={() => setSection("tax")}>
             <Percent /> Vergi oranları
           </button>
+          {profile && canManageWorkspace(profile.role) && <button className={section === "team" ? "active" : ""} onClick={() => setSection("team")}>
+            <Users /> Ekip yönetimi
+          </button>}
           {currentUser && <button className={section === "account" ? "active" : ""} onClick={() => setSection("account")}>
             <UserRound /> Hesabım
           </button>}
@@ -2296,11 +2322,11 @@ function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameCha
         <form className="panel settings-form" onSubmit={submit}>
           <div className="section-title">
             <span>
-              {section === "company" ? <Building2 /> : section === "quote" ? <FileText /> : section === "tax" ? <Percent /> : <ShieldCheck />}
+              {section === "company" ? <Building2 /> : section === "quote" ? <FileText /> : section === "tax" ? <Percent /> : section === "team" ? <Users /> : <ShieldCheck />}
             </span>
             <div>
-              <h3>{section === "company" ? "Şirket bilgileri" : section === "quote" ? "Teklif ayarları" : section === "tax" ? "Vergi oranları" : "Hesap güvenliği"}</h3>
-              <p>{section === "company" ? "Teklif ve PDF belgelerinde görünecek bilgiler." : section === "quote" ? "Yeni tekliflerin varsayılan tercihleri." : section === "tax" ? "Katalog ve teklif kalemlerinde kullanılabilecek KDV oranları." : "Profilinizi, e-posta doğrulamasını ve şifrenizi yönetin."}</p>
+              <h3>{section === "company" ? "Şirket bilgileri" : section === "quote" ? "Teklif ayarları" : section === "tax" ? "Vergi oranları" : section === "team" ? "Ekip yönetimi" : "Hesap güvenliği"}</h3>
+              <p>{section === "company" ? "Teklif ve PDF belgelerinde görünecek bilgiler." : section === "quote" ? "Yeni tekliflerin varsayılan tercihleri." : section === "tax" ? "Katalog ve teklif kalemlerinde kullanılabilecek KDV oranları." : section === "team" ? "Süreli davet bağlantıları ve çalışma alanı yetkileri." : "Profilinizi, e-posta doğrulamasını ve şifrenizi yönetin."}</p>
             </div>
           </div>
           {section === "company" && <div className="form-grid">
@@ -2326,6 +2352,13 @@ function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameCha
             <label className="full">KDV oranları (%)<input value={form.vatRates.join(", ")} onChange={(e) => set("vatRates", e.target.value.split(",").map((part) => Number(part.trim())).filter(Number.isFinite))} placeholder="0, 1, 10, 20" /><small>0–100 arasında, virgülle ayırın.</small></label>
             <label>Varsayılan KDV<select value={form.defaultVat} onChange={(e) => set("defaultVat", Number(e.target.value))}>{form.vatRates.map((rate) => <option key={rate} value={rate}>%{rate}</option>)}</select></label>
           </div>}
+          {section === "team" && profile && <div className="team-settings">
+            <div className="team-invite"><label>E-posta<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="ekip@firma.com" /></label><label>Rol<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as Exclude<WorkspaceRole, "owner">)}><option value="admin">Yönetici</option><option value="member">Üye</option><option value="viewer">Görüntüleyici</option></select></label><button type="button" className="primary" disabled={teamBusy || !inviteEmail.trim()} onClick={inviteMember}><UserPlus /> Davet bağlantısı oluştur</button></div>
+            <small className="team-help">Bağlantı 7 gün geçerlidir ve yalnızca yazılan e-posta adresiyle kullanılabilir. Bağlantıyı güvenli bir kanaldan paylaşın.</small>
+            {teamMessage && <div className="auth-success team-message">{teamMessage}</div>}{teamError && <div className="auth-error">{teamError}</div>}
+            <div className="team-list"><h4>Ekip üyeleri</h4>{members.map((member) => <div className="team-row" key={member.uid}><div><b>{member.fullName || member.email}</b><small>{member.email}</small></div><span className={`member-status ${member.status}`}>{member.status === "active" ? "Aktif" : "Devre dışı"}</span>{member.role === "owner" ? <em>İşletme sahibi</em> : <select aria-label={`${member.email} rolü`} value={member.role} disabled={profile.role !== "owner" || teamBusy} onChange={(event) => changeMember(member.uid, { role: event.target.value as Exclude<WorkspaceRole, "owner"> })}><option value="admin">Yönetici</option><option value="member">Üye</option><option value="viewer">Görüntüleyici</option></select>}{profile.role === "owner" && member.role !== "owner" && <button type="button" className="secondary" disabled={teamBusy} onClick={() => changeMember(member.uid, { status: member.status === "active" ? "disabled" : "active" })}>{member.status === "active" ? "Devre dışı bırak" : "Etkinleştir"}</button>}</div>)}</div>
+            {invitations.some((invite) => invite.status === "pending") && <div className="team-list"><h4>Bekleyen davetler</h4>{invitations.filter((invite) => invite.status === "pending").map((invite) => <div className="team-row" key={invite.id}><div><b>{invite.email}</b><small>{invite.role} · {invite.expiresAt.toDate().toLocaleDateString("tr-TR")} tarihine kadar</small></div><button type="button" className="secondary" disabled={teamBusy} onClick={async () => { await cancelWorkspaceInvitation(invite.id); await refreshTeam(); }}>İptal et</button></div>)}</div>}
+          </div>}
           {section === "account" && currentUser && <div className="account-settings">
             <div className="account-status-card"><span className={currentUser.emailVerified ? "verified" : "pending"}>{currentUser.emailVerified ? <CheckCircle2 /> : <Mail />}</span><div><b>{currentUser.email}</b><small>{currentUser.emailVerified ? "E-posta doğrulandı" : "E-posta doğrulaması bekleniyor"}</small></div><em>{profile?.role === "owner" ? "İşletme sahibi" : profile?.role === "admin" ? "Yönetici" : profile?.role === "viewer" ? "Görüntüleyici" : "Üye"}</em></div>
             <label>Ad soyad<input value={accountName} onChange={(event) => setAccountName(event.target.value)} /></label>
@@ -2335,7 +2368,7 @@ function SettingsPage({ settings, onSave, currentUser, profile, onAccountNameCha
             {accountMessage && <div className="auth-success">{accountMessage}</div>}
             {accountError && <div className="auth-error">{accountError}</div>}
           </div>}
-          {section !== "account" && <div className="settings-save">
+          {section !== "account" && section !== "team" && <div className="settings-save">
             {saved && <span className="save-confirmation">Kaydedildi</span>}
             <button className="primary" type="submit">
               <Check /> Ayarları kaydet
