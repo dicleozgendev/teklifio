@@ -125,6 +125,27 @@ npm run lint
 npm run build
 ```
 
+## Testing
+
+The unit and security-contract suite does not require external services:
+
+```bash
+npm run test:unit
+```
+
+The Playwright suite starts an isolated local demo server with Firebase configuration disabled. It covers desktop and mobile navigation, legal pages, customer and product creation, manual quote creation, lifecycle status changes, PDF download, search, refresh persistence, and the deterministic AI preview/approval flow. It never writes to production Firestore.
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+Run the complete local verification chain with:
+
+```bash
+npm run test:all
+```
+
 ## Environment variables
 
 Copy `.env.example` to `.env.local` and replace every placeholder locally. Never commit `.env.local`.
