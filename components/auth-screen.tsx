@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Building2, CheckCircle2, FileText, LockKeyhole, Mail } from "lucide-react";
 import { loginWithEmail, registerWithInvitation, registerWithOrganization, requestPasswordReset } from "@/lib/firebase/auth";
 import { authErrorMessage } from "@/lib/auth-utils";
+import { runtimeFlags } from "@/lib/runtime-config";
 
 export function AuthScreen() {
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
@@ -59,7 +60,8 @@ export function AuthScreen() {
           {error && <div className="auth-error">{error}</div>}
           {success && <div className="auth-success">{success}</div>}
           <button className="primary auth-submit" disabled={loading}>{loading ? "Lütfen bekleyin..." : mode === "login" ? "Giriş Yap" : mode === "signup" ? "Hesap Oluştur" : "Bağlantı Gönder"}<ArrowRight /></button>
-          {mode !== "reset" && !invitationId && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
+          {mode === "login" && !invitationId && !runtimeFlags.publicSignup && <div className="auth-success">Yeni hesaplar kontrollü demo erişimiyle açılmaktadır. Ekip davetiniz varsa davet bağlantısını kullanın.</div>}
+          {mode !== "reset" && !invitationId && (mode === "signup" || runtimeFlags.publicSignup) && <div className="auth-switch">{mode === "login" ? "Henüz hesabınız yok mu?" : "Zaten hesabınız var mı?"}<button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setSuccess(""); }}>{mode === "login" ? "Ücretsiz kayıt olun" : "Giriş yapın"}</button></div>}
           <nav className="auth-public-links" aria-label="Bilgi bağlantıları"><Link href="/yardim">Yardım</Link><Link href="/fiyatlandirma">Fiyatlandırma</Link><Link href="/gizlilik">Gizlilik</Link></nav>
         </form>
       </section>

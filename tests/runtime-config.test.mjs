@@ -18,3 +18,9 @@ test("explicit demo seeding is available only outside production", () => {
   assert.equal(resolveRuntimeFlags({ seedDemoData: "true", appEnvironment: "staging" }).seedDemoData, true);
   assert.equal(resolveRuntimeFlags({ seedDemoData: "true", appEnvironment: "development" }).seedDemoData, true);
 });
+
+test("public signup can be disabled independently for controlled demos", () => {
+  const flags = resolveRuntimeFlags({ demoMode: "true", appEnvironment: "production", publicSignup: "false" });
+  assert.equal(flags.publicSignup, false);
+  assert.equal(flags.demoMode, true);
+});
