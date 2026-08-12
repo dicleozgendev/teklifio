@@ -51,7 +51,18 @@ yarn-error.log*
 /dist/
 /.wrangler/
 /outputs/
+/output/
+/demo-recordings/
+/yeva-demo/
 /work/
+
+# local delivery and agent workspace files
+AGENTS.md
+CLAUDE.md
+Freelance_Hizmet_Tanitimi.md
+Teklifio_Ajans_Dogrulama_Kiti.md
+Teklifio_Ajans_Satis_Kiti.md
+*.docx
 
 # delivery archives
 *.zip

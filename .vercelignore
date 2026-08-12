@@ -7,3 +7,14 @@
 .wrangler
 dist
 work
+output
+outputs
+demo-recordings
+yeva-demo
+AGENTS.md
+CLAUDE.md
+Freelance_Hizmet_Tanitimi.md
+Teklifio_Ajans_Dogrulama_Kiti.md
+Teklifio_Ajans_Satis_Kiti.md
+*.docx
+*.zip
