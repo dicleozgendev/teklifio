@@ -1,5 +1,9 @@
 # Security Policy
 
+## Proprietary source
+
+Teklifio is proprietary commercial source code. Repository access does not grant permission to copy, modify, redistribute, sublicense, sell, or commercially use the source except under a separate written agreement with the copyright holder. See [PROPRIETARY.md](PROPRIETARY.md). Previous copies lawfully obtained under the terms that applied to those copies retain those previously granted rights.
+
 ## Supported versions
 
 Security updates are applied to the current `main` branch. This repository does not currently maintain multiple supported release branches.

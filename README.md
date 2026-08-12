@@ -116,10 +116,13 @@ Each business record carries an `organizationId`. The rules in `firestore.rules`
 - A Firebase project with Authentication and Firestore enabled
 - An OpenAI API key only if real AI generation is required
 
-### Setup
+### Setup for authorized contributors
+
+This is a private proprietary repository. Only contributors explicitly authorized by the repository owner may access, clone, use, or modify the source code. Authenticate with a GitHub account that has been granted repository access, then clone over HTTPS or SSH:
 
 ```bash
 git clone https://github.com/dicleozgendev/teklifio.git
+# Alternatively: git clone git@github.com:dicleozgendev/teklifio.git
 cd teklifio
 npm install
 cp .env.example .env.local
@@ -270,9 +273,15 @@ Not currently implemented:
 
 Future work may add these capabilities only after their security, privacy, and operational requirements are designed and tested.
 
-## License
+## Proprietary source notice
 
-This project is available under the [MIT License](LICENSE).
+Copyright © 2026 Dicle Ozgen. All rights reserved.
+
+This source code is proprietary and is not offered under an open-source license. No permission is granted to copy, modify, redistribute, sublicense, sell, or commercially use the source code except under a separate written agreement with the copyright holder.
+
+Previous copies lawfully obtained while an earlier revision was published under the MIT License remain subject to the rights granted with those copies; this change does not retroactively revoke those rights.
+
+See [PROPRIETARY.md](PROPRIETARY.md) for the repository notice applicable to the current revision.
 
 ## Suggested repository metadata
 
