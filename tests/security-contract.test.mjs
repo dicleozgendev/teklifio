@@ -4,6 +4,7 @@ import test from "node:test";
 
 const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
 const aiRoute = await readFile(new URL("../app/api/ai-quote/route.ts", import.meta.url), "utf8");
+const clientErrorRoute = await readFile(new URL("../app/api/client-error/route.ts", import.meta.url), "utf8");
 const firebaseClient = await readFile(new URL("../lib/firebase/client.ts", import.meta.url), "utf8");
 
 test("Firestore rules retain organization isolation and deny unknown paths", () => {
@@ -27,6 +28,9 @@ test("team invitations stay email-bound, expiring, and cannot grant owner", () =
   assert.match(rules, /request\.resource\.data\.role in \['admin', 'member', 'viewer'\]/);
   assert.match(rules, /request\.time < resource\.data\.expiresAt/);
   assert.match(rules, /request\.resource\.data\.status == 'active'/);
+  assert.match(rules, /affectedKeys\(\)\.hasOnly\(\['status', 'updatedAt'\]\)/);
+  assert.match(rules, /affectedKeys\(\)\.hasOnly\(\['status', 'acceptedBy', 'updatedAt'\]\)/);
+  assert.match(rules, /request\.resource\.data\.expiresAt == resource\.data\.expiresAt/);
 });
 
 test("only the owner can change another member while preserving organization identity", () => {
@@ -42,6 +46,10 @@ test("shared quotes expose only expiring token reads and immutable versions", ()
   assert.match(rules, /allow get: if resource\.data\.active == true && request\.time < resource\.data\.expiresAt/);
   assert.match(rules, /allow list: if hasWorkspace\(\)/);
   assert.doesNotMatch(rules, /match \/quoteShares[\s\S]*allow read: if true/);
+  assert.match(rules, /token\.matches\('\^\[0-9a-f\]/);
+  assert.match(rules, /request\.resource\.data\.expiresAt <= request\.time \+ duration\.value\(30, 'd'\)/);
+  assert.match(rules, /request\.resource\.data\.active == false/);
+  assert.match(rules, /affectedKeys\(\)\.hasOnly\(\['active', 'updatedAt'\]\)/);
   assert.match(rules, /match \/quoteVersions\/\{documentId\}/);
   assert.match(rules, /allow update, delete: if false/);
 });
@@ -65,4 +73,12 @@ test("OpenAI key stays server-side", () => {
   assert.match(aiRoute, /process\.env\.OPENAI_API_KEY/);
   assert.doesNotMatch(firebaseClient, /OPENAI_API_KEY/);
   assert.doesNotMatch(aiRoute, /NEXT_PUBLIC_OPENAI/);
+});
+
+test("server routes apply bounded abuse protection without logging request content", () => {
+  assert.match(aiRoute, /consumeRateLimit/);
+  assert.match(clientErrorRoute, /consumeRateLimit/);
+  assert.doesNotMatch(aiRoute, /console\.(?:log|warn|error)\([^)]*prompt/);
+  assert.doesNotMatch(aiRoute, /console\.(?:log|warn|error)\([^)]*idToken/);
+  assert.doesNotMatch(aiRoute, /console\.(?:log|warn|error)\([^)]*apiKey/);
 });

@@ -1,5 +1,6 @@
 import { deterministicQuoteAi, type AiCustomer, type AiProduct } from "@/lib/ai-quote-parser";
 import type { AiQuoteApiResponse } from "@/lib/ai-quote-contract";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/rate-limit";
 
 type FirestoreValue = {
   stringValue?: string;
@@ -233,6 +234,27 @@ export async function POST(request: Request) {
     else console.log(entry);
     return json(body, status, mode);
   };
+  const rateLimit = consumeRateLimit(await requestRateLimitKey(request, "ai-quote"), {
+    limit: 12,
+    windowMs: 60_000,
+  });
+  if (!rateLimit.allowed) {
+    console.warn(JSON.stringify({
+      level: "warn",
+      message: "ai_quote_rate_limited",
+      route: "/api/ai-quote",
+      requestId,
+      status: 429,
+      durationMs: Date.now() - startedAt,
+    }));
+    return Response.json(emptyResponse(), {
+      status: 429,
+      headers: {
+        "Retry-After": String(rateLimit.retryAfterSeconds),
+        "X-AI-Mode": "none",
+      },
+    });
+  }
   const authorization = request.headers.get("authorization");
   const idToken = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)

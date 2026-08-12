@@ -230,6 +230,7 @@ The standard Vercel build command is `npm run build`. No secret values are store
 - `.env.local`, `.env*` files other than `.env.example`, Vercel metadata, build output, logs, caches, and private keys are ignored by Git.
 - The OpenAI key is read only by the server-side API route.
 - The AI route requires a valid Firebase ID token before reading organization data.
+- Server routes apply bounded, per-instance request throttling; production edge/firewall limits remain recommended for distributed abuse protection.
 - Firestore Security Rules enforce organization-scoped access for customers, products, quotes, and quote items.
 - Firebase service-account credentials are not required by this repository and must not be added to browser code or committed.
 - AI output is validated against existing organization records and requires user approval before persistence.

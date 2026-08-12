@@ -1,6 +1,17 @@
 import { runtimeEnvironment, sanitizeClientError } from "@/lib/observability";
+import { consumeRateLimit, requestRateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  const rateLimit = consumeRateLimit(await requestRateLimitKey(request, "client-error"), {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > 2048) {
     return Response.json({ error: "Payload too large" }, { status: 413 });
