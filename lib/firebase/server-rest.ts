@@ -51,6 +51,10 @@ export async function consumeDistributedRateLimit(input: RateLimitInput): Promis
   const url = `${input.base}/apiRateLimits/${encodeURIComponent(bucketId)}`;
   const headers = { Authorization: `Bearer ${input.idToken}`, "Content-Type": "application/json" };
   const retryAfterSeconds = Math.max(1, Math.ceil((windowStart + input.windowMs - now) / 1000));
+  const expiredBucketId = `${input.uid}_${input.scope}_${windowStart - input.windowMs * 2}`;
+  void fetch(`${input.base}/apiRateLimits/${encodeURIComponent(expiredBucketId)}`, {
+    method: "DELETE", headers, cache: "no-store",
+  }).catch(() => undefined);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const read = await fetch(url, { headers, cache: "no-store" });
     if (read.status === 404) {

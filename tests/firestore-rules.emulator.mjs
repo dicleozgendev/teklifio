@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import test, { after, before } from "node:test";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, setDoc, Timestamp, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, Timestamp, updateDoc, writeBatch } from "firebase/firestore";
 
 let env;
 const now = Date.now();
@@ -92,7 +92,7 @@ test("share tokens are unlistable publicly, guessed tokens fail, and expiry/revo
   await assertFails(getDoc(doc(publicDb, `quoteShares/${validToken}`)));
 });
 
-test("rate-limit buckets cannot be reset, reassigned, listed or deleted", async () => {
+test("rate-limit buckets cannot be reset or reassigned and only expired own buckets can be deleted", async () => {
   const db = dbFor("member-a", "member-a@example.com");
   const windowStart = Math.floor(Date.now() / 60_000) * 60_000;
   const ref = doc(db, `apiRateLimits/member-a_ai-quote_${windowStart}`);
@@ -100,4 +100,8 @@ test("rate-limit buckets cannot be reset, reassigned, listed or deleted", async 
   await assertSucceeds(updateDoc(ref, { count: 2 }));
   await assertFails(updateDoc(ref, { count: 1 }));
   await assertFails(updateDoc(ref, { organizationId: "org-b", count: 3 }));
+  await assertFails(deleteDoc(ref));
+  const expiredRef = doc(db, `apiRateLimits/member-a_ai-quote_${windowStart - 120_000}`);
+  await env.withSecurityRulesDisabled(async (context) => setDoc(doc(context.firestore(), expiredRef.path), { uid: "member-a", organizationId: "org-a", scope: "ai-quote", count: 2, windowStart: Timestamp.fromMillis(windowStart - 120_000), expiresAt: Timestamp.fromMillis(windowStart) }));
+  await assertSucceeds(deleteDoc(expiredRef));
 });

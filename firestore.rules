@@ -221,7 +221,12 @@ service cloud.firestore {
     match /apiRateLimits/{bucketId} {
       allow get: if hasWorkspace()
         && bucketId.matches('^' + request.auth.uid + '_(ai-quote|client-error)_[0-9]+$');
-      allow list, delete: if false;
+      allow list: if false;
+      allow delete: if hasWorkspace()
+        && resource.data.uid == request.auth.uid
+        && resource.data.organizationId == organizationId()
+        && bucketId.matches('^' + request.auth.uid + '_(ai-quote|client-error)_[0-9]+$')
+        && request.time >= resource.data.expiresAt;
       allow create: if hasWorkspace()
         && bucketId.matches('^' + request.auth.uid + '_(ai-quote|client-error)_[0-9]+$')
         && request.resource.data.uid == request.auth.uid
