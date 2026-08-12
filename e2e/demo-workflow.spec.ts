@@ -54,3 +54,15 @@ test("AI preview fills the form only after explicit approval", async ({ page }) 
   await expect(page.getByLabel("İndirim").first()).toHaveValue("10");
   await expect(page.getByLabel("KDV").first()).toHaveValue("20");
 });
+
+test("CSV import requires preview confirmation and skips duplicates", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Müşteriler/ }).click();
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "CSV içe aktar" }).click();
+  (await chooser).setFiles({ name: "customers.csv", mimeType: "text/csv", buffer: Buffer.from("company,name,email\nCSV Test Ltd,Demo,csv@test.example\nCSV Test Ltd,Demo,csv@test.example") });
+  await expect(page.getByRole("heading", { name: "Müşteri CSV önizlemesi" })).toBeVisible();
+  await expect(page.getByText("1 mükerrer")).toBeVisible();
+  await page.getByRole("button", { name: /1 kaydı içe aktar/ }).click();
+  await expect(page.getByRole("heading", { name: "CSV Test Ltd" })).toBeVisible();
+});

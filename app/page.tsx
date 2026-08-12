@@ -52,6 +52,7 @@ import {
 import { requestPasswordReset, resendVerificationEmail, updateAccountName } from "@/lib/firebase/auth";
 import { authErrorMessage, canEditWorkspaceData, canManageWorkspace, type WorkspaceRole } from "@/lib/auth-utils";
 import { runtimeFlags } from "@/lib/runtime-config";
+import { previewCustomerCsv, previewProductCsv, type CsvPreviewRow } from "@/lib/csv-import";
 import {
   ArrowLeft,
   ArrowRight,
@@ -84,6 +85,7 @@ import {
   Sparkles,
   Trash2,
   TrendingUp,
+  Upload,
   UserPlus,
   UserRound,
   Users,
@@ -156,7 +158,7 @@ const later = (days: number) => {
 const defaultSettings: WorkspaceSettings = {
   companyName: "Teklifio Dijital Çözümler", address: "Maslak Mah. Büyükdere Cad. No: 255, Sarıyer / İstanbul",
   phone: "+90 212 555 01 01", email: "merhaba@teklifio.com", website: "https://teklifio.vercel.app",
-  taxOffice: "Maslak", taxNumber: "123 456 7890", validityDays: 14, quotePrefix: "TKL",
+  taxOffice: "Maslak", taxNumber: "123 456 7890", logoDataUrl: "", primaryColor: "#6756e8", validityDays: 14, quotePrefix: "TKL",
   currency: "TRY", defaultNote: "İş birliğiniz için teşekkür ederiz.", footerText: "Bu teklif belirtilen geçerlilik tarihine kadar geçerlidir.",
   vatRates: [0, 1, 10, 20], defaultVat: 20,
 };
@@ -646,7 +648,7 @@ export default function Home() {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" style={{ "--primary": settings.primaryColor, "--primary-dark": settings.primaryColor } as React.CSSProperties}>
       {((isFirebaseConfigured && currentUser && !onboardingCompleted) || onboardingReplayOpen) && (
         <Onboarding
           organizationName={organizationName}
@@ -676,7 +678,9 @@ export default function Home() {
       <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
         <div className="brand">
           <div className="brand-mark">
-            <FileText size={19} />
+            {/* The organization logo is an authenticated, validated local data URL; remote image optimization is intentionally not used. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {settings.logoDataUrl ? <img src={settings.logoDataUrl} alt="Şirket logosu" /> : <FileText size={19} />}
           </div>
           <span>
             teklif<span>io</span>
@@ -1182,6 +1186,7 @@ function Customers({
   editable: boolean;
 }) {
   const [editing, setEditing] = useState<Customer | "new" | null>(initiallyOpen ? "new" : null);
+  const [importRows, setImportRows] = useState<CsvPreviewRow[] | null>(null);
   const [detail, setDetail] = useState<Customer | null>(null);
   const shownDetail = detail ?? customers.find((item) => item.id === focusedId) ?? null;
   const [query, setQuery] = useState("");
@@ -1216,9 +1221,9 @@ function Customers({
         title="Müşteriler"
         copy={`${customers.length} müşteri kaydı · İlişkilerini tek yerden yönet.`}
         action={editable ?
-          <button className="primary" onClick={() => { setForm({ company: "", name: "", email: "", phone: "", address: "", taxOffice: "", taxNumber: "", notes: "" }); setEditing("new"); }}>
+          <div className="page-actions"><CsvImportButton label="CSV içe aktar" onRead={(text) => setImportRows(previewCustomerCsv(text, customers))} /><button className="primary" onClick={() => { setForm({ company: "", name: "", email: "", phone: "", address: "", taxOffice: "", taxNumber: "", notes: "" }); setEditing("new"); }}>
             <Plus size={18} /> Müşteri ekle
-          </button>
+          </button></div>
         : undefined}
       />
       <div className="toolbar">
@@ -1307,6 +1312,7 @@ function Customers({
         </Modal>
       )}
       {shownDetail && <Modal title={shownDetail.company} onClose={() => { setDetail(null); onClearFocus(); }}><div className="record-detail"><p><b>Yetkili:</b> {shownDetail.name || "Belirtilmedi"}</p><p><b>E-posta:</b> {shownDetail.email || "Belirtilmedi"}</p><p><b>Telefon:</b> {shownDetail.phone || "Belirtilmedi"}</p><p><b>Adres:</b> {shownDetail.address || "Belirtilmedi"}</p><p><b>Vergi:</b> {[shownDetail.taxOffice, shownDetail.taxNumber].filter(Boolean).join(" · ") || "Belirtilmedi"}</p><p><b>Not:</b> {shownDetail.notes || "Belirtilmedi"}</p></div></Modal>}
+      {importRows && <CsvImportPreview title="Müşteri CSV önizlemesi" rows={importRows} onClose={() => setImportRows(null)} onConfirm={() => { const now = Date.now(); const records = importRows.filter((row) => !row.duplicate && !row.errors.length).map((row, index) => ({ id: now + index, ...row.values, initials: row.values.company.split(" ").map((part) => part[0]).join("").slice(0, 2).toLocaleUpperCase("tr-TR"), color: "indigo" } as Customer)); setCustomers([...customers, ...records]); setImportRows(null); }} />}
     </>
   );
 }
@@ -1331,6 +1337,7 @@ function Products({
   editable: boolean;
 }) {
   const [editing, setEditing] = useState<Product | "new" | null>(initiallyOpen ? "new" : null);
+  const [importRows, setImportRows] = useState<CsvPreviewRow[] | null>(null);
   const [detail, setDetail] = useState<Product | null>(null);
   const shownDetail = detail ?? products.find((item) => item.id === focusedId) ?? null;
   const [query, setQuery] = useState("");
@@ -1357,9 +1364,9 @@ function Products({
         title="Ürün & Hizmetler"
         copy="Tekliflerinde kullandığın ürün ve hizmet kataloğu."
         action={editable ?
-          <button className="primary" onClick={() => { setForm({ name: "", code: "", type: "Hizmet", price: 0, vat: 20, unit: "Adet", description: "" }); setEditing("new"); }}>
+          <div className="page-actions"><CsvImportButton label="CSV içe aktar" onRead={(text) => setImportRows(previewProductCsv(text, products))} /><button className="primary" onClick={() => { setForm({ name: "", code: "", type: "Hizmet", price: 0, vat: 20, unit: "Adet", description: "" }); setEditing("new"); }}>
             <Plus size={18} /> Ürün veya hizmet ekle
-          </button>
+          </button></div>
         : undefined}
       />
       <div className="toolbar">
@@ -1493,6 +1500,7 @@ function Products({
         </Modal>
       )}
       {shownDetail && <Modal title={shownDetail.name} onClose={() => { setDetail(null); onClearFocus(); }}><div className="record-detail"><p><b>Kod:</b> {shownDetail.code || "Belirtilmedi"}</p><p><b>Tür:</b> {shownDetail.type}</p><p><b>Birim:</b> {shownDetail.unit}</p><p><b>Birim fiyat:</b> {currency(shownDetail.price)}</p><p><b>Varsayılan KDV:</b> %{shownDetail.vat}</p><p><b>Açıklama:</b> {shownDetail.description || "Belirtilmedi"}</p></div></Modal>}
+      {importRows && <CsvImportPreview title="Ürün/hizmet CSV önizlemesi" rows={importRows} onClose={() => setImportRows(null)} onConfirm={() => { const now = Date.now(); const records = importRows.filter((row) => !row.duplicate && !row.errors.length).map((row, index) => ({ id: now + index, name: row.values.name, code: row.values.code, type: row.values.type as "Ürün" | "Hizmet", price: Number(row.values.price), vat: Number(row.values.vat), unit: row.values.unit, description: row.values.description })); setProducts([...products, ...records]); setImportRows(null); }} />}
     </>
   );
 }
@@ -2494,6 +2502,8 @@ function SettingsPage({ settings, organizationName, onSave, currentUser, profile
             <label>Vergi dairesi<input value={form.taxOffice} onChange={(e) => set("taxOffice", e.target.value)} /></label>
             <label>Vergi numarası<input value={form.taxNumber} onChange={(e) => set("taxNumber", e.target.value)} /></label>
             <label className="full">Adres<textarea value={form.address} onChange={(e) => set("address", e.target.value)} rows={3} /></label>
+            <label>Marka rengi<input type="color" value={form.primaryColor} onChange={(e) => set("primaryColor", e.target.value)} /></label>
+            <label className="full">Şirket logosu<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 400_000) { window.alert("Logo 400 KB'dan küçük olmalıdır."); return; } const reader = new FileReader(); reader.onload = () => set("logoDataUrl", String(reader.result || "")); reader.readAsDataURL(file); }} /><small>PNG, JPG veya WebP; en fazla 400 KB. Logo yalnızca bu çalışma alanında saklanır.</small>{form.logoDataUrl && <button type="button" className="secondary" onClick={() => set("logoDataUrl", "")}>Logoyu kaldır</button>}</label>
           </div>}
           {section === "quote" && <div className="form-grid">
             <label>Geçerlilik süresi (gün)<input type="number" min="1" max="365" value={form.validityDays} onChange={(e) => set("validityDays", Number(e.target.value))} /></label>
@@ -2534,6 +2544,16 @@ function SettingsPage({ settings, organizationName, onSave, currentUser, profile
       </div>
     </>
   );
+}
+
+function CsvImportButton({ label, onRead }: { label: string; onRead: (text: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  return <><input ref={input} className="visually-hidden" type="file" accept=".csv,text/csv" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { onRead(await file.text()); } catch (error) { window.alert(error instanceof Error ? error.message : "CSV dosyası okunamadı."); } event.target.value = ""; }} /><button type="button" className="secondary" onClick={() => input.current?.click()}><Upload size={17} /> {label}</button></>;
+}
+
+function CsvImportPreview({ title, rows, onClose, onConfirm }: { title: string; rows: CsvPreviewRow[]; onClose: () => void; onConfirm: () => void }) {
+  const valid = rows.filter((row) => !row.duplicate && !row.errors.length);
+  return <Modal title={title} onClose={onClose}><div className="csv-preview"><p>Dosya henüz kaydedilmedi. Geçerli kayıtları kontrol edip açıkça onaylayın.</p><div className="csv-summary"><b>{valid.length} içe aktarılabilir</b><span>{rows.filter((row) => row.duplicate).length} mükerrer</span><span>{rows.filter((row) => row.errors.length).length} hatalı</span></div><div className="csv-table"><table><thead><tr><th>SATIR</th><th>KAYIT</th><th>DURUM</th></tr></thead><tbody>{rows.map((row) => <tr key={row.row}><td>{row.row}</td><td>{row.values.company || row.values.name}</td><td>{row.duplicate ? "Mükerrer — atlanacak" : row.errors.length ? row.errors.join(" ") : "Hazır"}</td></tr>)}</tbody></table></div><div className="modal-actions"><button type="button" className="secondary" onClick={onClose}>Vazgeç</button><button type="button" className="primary" disabled={!valid.length} onClick={onConfirm}><Check /> {valid.length} kaydı içe aktar</button></div></div></Modal>;
 }
 
 function Modal({

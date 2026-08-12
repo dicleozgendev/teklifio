@@ -26,7 +26,7 @@ export type PdfCustomer = {
   taxOffice?: string;
   taxNumber?: string;
 };
-export type PdfCompany = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; footerText: string; currency: string };
+export type PdfCompany = { companyName: string; address: string; phone: string; email: string; website: string; taxOffice: string; taxNumber: string; footerText: string; currency: string; logoDataUrl?: string; primaryColor?: string };
 
 const money = (value: number, currency = "TRY") =>
   new Intl.NumberFormat("tr-TR", {
@@ -53,6 +53,7 @@ export async function downloadQuotePdf(
   customer: PdfCustomer,
   company: PdfCompany,
 ) {
+  const brandColor = /^#[0-9a-f]{6}$/i.test(company.primaryColor || "") ? company.primaryColor! : "#6756E8";
   const quoteMoney = (value: number) => money(value, quote.currency || company.currency);
   const previewWindow = window.open("", "_blank");
   const [{ default: pdfMake }, { default: fontVfs }] = await Promise.all([
@@ -123,12 +124,12 @@ export async function downloadQuotePdf(
           {
             width: "*",
             stack: [
-              {
+              company.logoDataUrl ? { image: company.logoDataUrl, width: 72, height: 36, fit: [72, 36] } : {
                 columns: [
                   {
                     width: 32,
                     canvas: [
-                      { type: "rect", x: 0, y: 0, w: 30, h: 30, r: 7, color: "#6756E8" },
+                      { type: "rect", x: 0, y: 0, w: 30, h: 30, r: 7, color: brandColor },
                     ],
                   },
                   {
@@ -136,7 +137,7 @@ export async function downloadQuotePdf(
                     margin: [7, 5, 0, 0],
                     text: [
                       { text: "teklif", bold: true, fontSize: 17, color: "#1B1830" },
-                      { text: "io", bold: true, fontSize: 17, color: "#6756E8" },
+                      { text: "io", bold: true, fontSize: 17, color: brandColor },
                     ],
                   },
                 ],
@@ -152,7 +153,7 @@ export async function downloadQuotePdf(
             alignment: "right",
             stack: [
               { text: "FİYAT TEKLİFİ", bold: true, fontSize: 20, color: "#1B1830", characterSpacing: 1.2 },
-              { text: quote.id, bold: true, color: "#6756E8", fontSize: 11, margin: [0, 5, 0, 15] },
+              { text: quote.id, bold: true, color: brandColor, fontSize: 11, margin: [0, 5, 0, 15] },
               {
                 table: {
                   widths: [72, 98],

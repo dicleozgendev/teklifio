@@ -2779,3 +2779,11 @@ th { color: #696574; }
 .guide-card small,
 .pricing-card small { color: #5849c7; }
 .legal-document > footer { color: #676271; }
+.page-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.csv-preview > p { color: var(--muted); margin: 0 0 14px; }
+.csv-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.csv-summary > * { padding: 7px 10px; background: var(--soft); border-radius: 8px; font-size: 12px; }
+.csv-table { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.csv-table table { min-width: 520px; }
+.brand-mark img { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; }

@@ -243,6 +243,8 @@ The standard Vercel build command is `npm run build`. No secret values are store
 
 For responsible vulnerability reporting, see [SECURITY.md](SECURITY.md).
 
+Operational runbooks cover [release operations](docs/OPERATIONS-CHECKLIST.md), [backup and recovery](docs/BACKUP-RECOVERY.md), [monitoring](docs/MONITORING.md), [white-label onboarding](docs/WHITE-LABEL-ONBOARDING.md), and [incident response](docs/INCIDENT-RESPONSE.md). Managed Firestore backups require separately approved Google Cloud billing and IAM configuration; this repository never enables billing automatically.
+
 ## Demo notice
 
 The hosted demo may contain seeded, fictional records and example financial values. The demo label is controlled by `NEXT_PUBLIC_DEMO_MODE`; fictional record seeding is controlled separately by `NEXT_PUBLIC_SEED_DEMO_DATA` and is disabled in production. Demo content does not represent real customers, transactions, legal advice, accounting advice, or tax advice.
