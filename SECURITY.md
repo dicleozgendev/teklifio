@@ -2,7 +2,7 @@
 
 ## Proprietary source
 
-Teklifio is proprietary commercial source code. Repository access does not grant permission to copy, modify, redistribute, sublicense, sell, or commercially use the source except under a separate written agreement with the copyright holder. See [PROPRIETARY.md](PROPRIETARY.md). Previous copies lawfully obtained under the terms that applied to those copies retain those previously granted rights.
+Teklifio is publicly viewable proprietary commercial source code. Public visibility permits portfolio, demonstration, and evaluation review only and grants no permission to copy, modify, redistribute, sublicense, sell, deploy, or commercially use the source except under a separate written agreement with the copyright holder. See [PROPRIETARY.md](PROPRIETARY.md). Previous copies lawfully obtained under the terms that applied to those copies retain those previously granted rights.
 
 ## Supported versions
 

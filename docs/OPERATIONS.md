@@ -2,7 +2,7 @@
 
 ## Source access and commercial use
 
-This runbook accompanies proprietary Teklifio source code and is intended only for authorized operators and contributors. Repository access does not itself grant redistribution, sublicensing, resale, or commercial-use rights. The current source notice is maintained in `PROPRIETARY.md`; historical license rights for copies lawfully obtained under an earlier revision are not retroactively revoked.
+This runbook accompanies publicly viewable proprietary Teklifio source code and is intended only for authorized operators, contributors, and evaluators. Public repository access does not grant copying, modification, deployment, redistribution, sublicensing, resale, or commercial-use rights. The current source notice is maintained in `PROPRIETARY.md`; historical license rights for copies lawfully obtained under an earlier revision are not retroactively revoked.
 
 This runbook defines the no-cost operational baseline for Teklifio. It does not enable a paid monitoring, analytics, email, or backup product.
 

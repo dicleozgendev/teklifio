@@ -116,9 +116,9 @@ Each business record carries an `organizationId`. The rules in `firestore.rules`
 - A Firebase project with Authentication and Firestore enabled
 - An OpenAI API key only if real AI generation is required
 
-### Setup for authorized contributors
+### Setup for authorized contributors or evaluators
 
-This is a private proprietary repository. Only contributors explicitly authorized by the repository owner may access, clone, use, or modify the source code. Authenticate with a GitHub account that has been granted repository access, then clone over HTTPS or SSH:
+These setup instructions are provided only for contributors authorized by the repository owner and evaluators reviewing the project. Public visibility does not grant permission to use, modify, deploy, redistribute, or commercially exploit the source code.
 
 ```bash
 git clone https://github.com/dicleozgendev/teklifio.git
@@ -277,9 +277,15 @@ Future work may add these capabilities only after their security, privacy, and o
 
 Copyright © 2026 Dicle Ozgen. All rights reserved.
 
-This source code is proprietary and is not offered under an open-source license. No permission is granted to copy, modify, redistribute, sublicense, sell, or commercially use the source code except under a separate written agreement with the copyright holder.
+This repository is publicly viewable for portfolio, demonstration, and evaluation purposes only.
 
-Previous copies lawfully obtained while an earlier revision was published under the MIT License remain subject to the rights granted with those copies; this change does not retroactively revoke those rights.
+The source code is proprietary and is not offered under an open-source license.
+
+No permission is granted to copy, modify, redistribute, sublicense, sell, deploy, or commercially use the source code except under a separate written agreement with the copyright holder.
+
+Public availability of the repository does not grant a license to use the source code.
+
+Previous copies lawfully obtained while an earlier revision was published under the MIT License remain subject to the rights granted with those copies; this notice does not retroactively revoke those rights.
 
 See [PROPRIETARY.md](PROPRIETARY.md) for the repository notice applicable to the current revision.
 
