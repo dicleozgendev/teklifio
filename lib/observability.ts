@@ -17,10 +17,11 @@ export function sanitizeClientError(input: unknown): SafeClientError {
   const rawPath = typeof record.path === "string" && record.path.startsWith("/")
     ? record.path.split(/[?#]/, 1)[0]
     : "/";
+  const safePath = /^\/teklif\/[0-9a-f-]+$/i.test(rawPath) ? "/teklif/:share" : rawPath;
   const digest = cleanToken(record.digest, "", 100);
   return {
     type: cleanToken(record.type, "ApplicationError", 64),
-    path: cleanToken(rawPath, "/", 200),
+    path: cleanToken(safePath, "/", 200),
     ...(digest ? { digest } : {}),
   };
 }

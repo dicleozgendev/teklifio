@@ -7,11 +7,12 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "test:unit": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-teklifio-security \"node --test tests/firestore-rules.emulator.mjs\"",
     "test:e2e": "playwright test",
-    "test:all": "npm run test:unit && npm run test:e2e && npm run lint && npm run build",
+    "test:all": "npm run test:unit && npm run test:rules && npm run test:e2e && npm run lint && npm run build",
     "test": "npm run test:unit && npm run lint && npm run build",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
@@ -29,6 +30,7 @@
     "@axe-core/playwright": "^4.12.1",
     "@cloudflare/vite-plugin": "1.37.1",
     "@eslint/js": "9.39.4",
+    "@firebase/rules-unit-testing": "^5.0.0",
     "@next/eslint-plugin-next": "^16.3.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "4.2.1",

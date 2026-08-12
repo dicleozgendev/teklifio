@@ -8,7 +8,6 @@ import {
   updateProfile,
 } from "firebase/auth";
 import {
-  collection,
   doc,
   getDoc,
   serverTimestamp,
@@ -33,12 +32,13 @@ export async function registerWithOrganization(input: {
 
   try {
     await updateProfile(credential.user, { displayName: input.fullName });
-    const organizationRef = doc(collection(services.db, "organizations"));
+    const organizationRef = doc(services.db, "organizations", credential.user.uid);
     const userRef = doc(services.db, "users", credential.user.uid);
     const batch = writeBatch(services.db);
     batch.set(organizationRef, {
       name: input.organizationName.trim(),
       ownerId: credential.user.uid,
+      registrationEmail: input.email.trim().toLocaleLowerCase("tr-TR"),
       onboardingCompleted: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

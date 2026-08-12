@@ -35,6 +35,7 @@ The quote assistant accepts a natural-language request, matches only customers a
 - Quote and VAT defaults configurable from the settings screen
 - Modern, print-ready PDF generation with company, customer, line-item, total, note, and approval information
 - Firebase Authentication with email/password registration, verification, password reset, sign-in, sign-out, and session restoration
+- Backend-enforced closed organization registration through expiring administrator-created authorization records
 - First-run onboarding and account-security settings
 - Team invitations with owner, administrator, member, and viewer roles
 - Organization-scoped Firestore data protected by Security Rules
@@ -203,6 +204,8 @@ Firebase web configuration is designed to be browser-visible. Access control mus
 
 8. Add local and deployed domains to Firebase Authentication's authorized domains when required.
 
+Production organization registration is closed at Firestore rules level. Before an approved owner registers, create an expiring `registrationAuthorizations/{lowercase-email}` document through Firebase Console or trusted Admin SDK. Client code cannot read or write this collection. Team invitation acceptance remains email-bound and separate. See `docs/OPERATIONS.md`.
+
 Do not replace `firestore.rules` with public test rules. The included rules are part of the organization's data-isolation boundary.
 
 ## OpenAI integration
@@ -230,7 +233,7 @@ The standard Vercel build command is `npm run build`. No secret values are store
 - `.env.local`, `.env*` files other than `.env.example`, Vercel metadata, build output, logs, caches, and private keys are ignored by Git.
 - The OpenAI key is read only by the server-side API route.
 - The AI route requires a valid Firebase ID token before reading organization data.
-- Server routes apply bounded, per-instance request throttling; production edge/firewall limits remain recommended for distributed abuse protection.
+- AI and client-error routes require a valid active Firebase workspace and use Firestore-backed per-user throttling shared across distributed Vercel instances.
 - Firestore Security Rules enforce organization-scoped access for customers, products, quotes, and quote items.
 - Firebase service-account credentials are not required by this repository and must not be added to browser code or committed.
 - AI output is validated against existing organization records and requires user approval before persistence.

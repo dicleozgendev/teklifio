@@ -25,7 +25,10 @@ export type WorkspaceProfile = { uid: string; organizationId: string; fullName: 
 export type WorkspaceMember = { uid: string; organizationId: string; fullName: string; email: string; role: WorkspaceRole; status: "active" | "disabled" };
 export type WorkspaceInvitation = { id: string; organizationId: string; organizationName: string; email: string; role: Exclude<WorkspaceRole, "owner">; status: "pending" | "accepted" | "cancelled"; expiresAt: Timestamp };
 export type QuoteVersion = { id: string; quoteId: string; organizationId: string; createdBy: string; createdAt?: Timestamp; snapshot: WorkspaceQuote };
-export type QuoteShare = { token: string; quoteId: string; organizationId: string; active: boolean; expiresAt: Timestamp; quote: WorkspaceQuote; customer: WorkspaceCustomer; settings: WorkspaceSettings };
+export type SharedQuoteSnapshot = { id: string; date: string; validUntil: string; items: Array<Pick<WorkspaceQuoteItem, "name" | "qty" | "price" | "discount" | "vat">>; note: string; currency?: string };
+export type SharedCustomerSnapshot = Pick<WorkspaceCustomer, "company" | "name">;
+export type SharedCompanySnapshot = Pick<WorkspaceSettings, "companyName" | "address" | "email">;
+export type QuoteShare = { token: string; quoteId: string; organizationId: string; active: boolean; expiresAt: Timestamp; quote: SharedQuoteSnapshot; customer: SharedCustomerSnapshot; settings: SharedCompanySnapshot };
 export type QuoteActivity = { id: string; quoteId: string; organizationId: string; actorId: string; type: "created" | "pdf_downloaded" | "share_created" | "share_revoked" | "status_changed"; status?: WorkspaceQuoteStatus; createdAt?: Timestamp };
 
 async function getOrganizationId() {
@@ -262,7 +265,23 @@ export async function createQuoteShare(input: { quote: WorkspaceQuote; customer:
   const services = getFirebaseServices(); const user = services?.auth.currentUser;
   if (!services || !user) throw new Error("Firebase oturumu bulunamadı.");
   const organizationId = await getOrganizationId(); const token = crypto.randomUUID();
-  const share: QuoteShare = { token, quoteId: input.quote.id, organizationId, active: true, expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000), quote: input.quote, customer: input.customer, settings: input.settings };
+  const share: QuoteShare = {
+    token,
+    quoteId: input.quote.id,
+    organizationId,
+    active: true,
+    expiresAt: Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    quote: {
+      id: input.quote.id,
+      date: input.quote.date,
+      validUntil: input.quote.validUntil,
+      items: input.quote.items.map(({ name, qty, price, discount, vat }) => ({ name, qty, price, discount, vat })),
+      note: input.quote.note,
+      currency: input.quote.currency,
+    },
+    customer: { company: input.customer.company, name: input.customer.name },
+    settings: { companyName: input.settings.companyName, address: input.settings.address, email: input.settings.email },
+  };
   await setDoc(doc(services.db, "quoteShares", token), { ...share, createdBy: user.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
   return share;
 }

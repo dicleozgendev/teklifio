@@ -2211,7 +2211,7 @@ function QuoteDetail({
   };
   const shareQuote = async () => {
     setShareBusy(true); setShareError(""); setShareMessage("");
-    try { const share = await createQuoteShare({ quote, customer, settings }); await logQuoteActivity(quote.id, "share_created").catch(() => undefined); const url = `${window.location.origin}/teklif/${share.token}`; await navigator.clipboard.writeText(url); setShares((current) => [share, ...current]); setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "share_created" }, ...current]); setShareMessage(`Salt-okunur teklif bağlantısı kopyalandı: ${url}`); }
+    try { const share = await createQuoteShare({ quote, customer, settings }); await logQuoteActivity(quote.id, "share_created").catch(() => undefined); const url = `${window.location.origin}/teklif#${share.token}`; await navigator.clipboard.writeText(url); setShares((current) => [share, ...current]); setActivities((current) => [{ id: crypto.randomUUID(), quoteId: quote.id, organizationId: "", actorId: "", type: "share_created" }, ...current]); setShareMessage(`Salt-okunur teklif bağlantısı kopyalandı: ${url}`); }
     catch (caught) { setShareError(authErrorMessage(caught)); }
     finally { setShareBusy(false); }
   };

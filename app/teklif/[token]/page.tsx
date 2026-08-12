@@ -7,21 +7,20 @@ import { getFirebaseServices } from "@/lib/firebase/client";
 import type { QuoteShare } from "@/lib/firebase/workspace";
 
 const money = (value: number, currency = "TRY") => new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(value);
+const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-export default function SharedQuotePage({ params }: { params: Promise<{ token: string }> }) {
+export default function SharedQuotePage() {
   const [share, setShare] = useState<QuoteShare | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
   useEffect(() => {
-    params.then(async ({ token }) => {
-      const services = getFirebaseServices();
-      if (!services) { setState("unavailable"); return; }
-      try {
-        const snapshot = await getDoc(doc(services.db, "quoteShares", token));
-        if (!snapshot.exists()) { setState("unavailable"); return; }
-        setShare(snapshot.data() as QuoteShare); setState("ready");
-      } catch { setState("unavailable"); }
-    });
-  }, [params]);
+    const token = window.location.hash.slice(1).toLowerCase();
+    const services = getFirebaseServices();
+    if (!services || !tokenPattern.test(token)) { queueMicrotask(() => setState("unavailable")); return; }
+    getDoc(doc(services.db, "quoteShares", token)).then((snapshot) => {
+      if (!snapshot.exists()) { setState("unavailable"); return; }
+      setShare(snapshot.data() as QuoteShare); setState("ready");
+    }).catch(() => setState("unavailable"));
+  }, []);
   const totals = useMemo(() => {
     const items = share?.quote.items ?? [];
     const subtotal = items.reduce((sum, item) => sum + item.qty * item.price, 0);
@@ -37,9 +36,9 @@ export default function SharedQuotePage({ params }: { params: Promise<{ token: s
     <header className="shared-quote-toolbar"><div><span><CheckCircle2 /> Güvenli, salt-okunur teklif</span><small>Bu bağlantı üzerinden değişiklik yapılamaz.</small></div><button onClick={() => window.print()}><Printer /> Yazdır / PDF</button></header>
     <article className="shared-quote-paper">
       <div className="shared-paper-head"><div className="brand"><div className="brand-mark"><FileText /></div><span>teklif<span>io</span></span></div><div><b>TEKLİF</b><span>{quote.id}</span></div></div>
-      <section className="shared-info"><div><small>HAZIRLAYAN</small><b>{settings.companyName}</b><span>{settings.address}</span><span>{settings.email}</span></div><div><small>MÜŞTERİ</small><b>{customer.company}</b><span>{customer.name}</span><span>{customer.email}</span></div><div><small>TARİH</small><b>{new Date(quote.date).toLocaleDateString("tr-TR")}</b><span>Geçerlilik: {new Date(quote.validUntil).toLocaleDateString("tr-TR")}</span></div></section>
-      <div className="shared-table-wrap"><table className="paper-table"><thead><tr><th>ÜRÜN / HİZMET</th><th>ADET</th><th>BİRİM FİYAT</th><th>İNDİRİM</th><th>KDV</th><th>TUTAR</th></tr></thead><tbody>{quote.items.map((item) => <tr key={item.id}><td><b>{item.name}</b></td><td>{item.qty}</td><td>{money(item.price, quote.currency)}</td><td>%{item.discount}</td><td>%{item.vat}</td><td><b>{money(item.qty * item.price * (1 - item.discount / 100) * (1 + item.vat / 100), quote.currency)}</b></td></tr>)}</tbody></table></div>
-      <section className="shared-bottom"><div>{quote.note && <><small>TEKLİF NOTU</small><p>{quote.note}</p></>}</div><div className="paper-totals"><p><span>Ara toplam</span><b>{money(totals.subtotal, quote.currency)}</b></p><p><span>İndirim</span><b>− {money(totals.discount, quote.currency)}</b></p><p><span>KDV</span><b>{money(totals.vat, quote.currency)}</b></p><p className="paper-grand"><span>Genel toplam</span><b>{money(totals.total, quote.currency)}</b></p></div></section>
+      <section className="shared-info"><div><small>HAZIRLAYAN</small><b>{settings.companyName}</b><span>{settings.address}</span><span>{settings.email}</span></div><div><small>MÜŞTERİ</small><b>{customer.company}</b><span>{customer.name}</span></div><div><small>TARİH</small><b>{new Date(quote.date).toLocaleDateString("tr-TR")}</b><span>Geçerlilik: {new Date(quote.validUntil).toLocaleDateString("tr-TR")}</span></div></section>
+      <div className="shared-table-wrap"><table className="paper-table"><thead><tr><th>ÜRÜN / HİZMET</th><th>ADET</th><th>BİRİM FİYAT</th><th>İNDİRİM</th><th>KDV</th><th>TUTAR</th></tr></thead><tbody>{quote.items.map((item, index) => <tr key={`${item.name}-${index}`}><td><b>{item.name}</b></td><td>{item.qty}</td><td>{money(item.price, quote.currency ?? "TRY")}</td><td>%{item.discount}</td><td>%{item.vat}</td><td><b>{money(item.qty * item.price * (1 - item.discount / 100) * (1 + item.vat / 100), quote.currency ?? "TRY")}</b></td></tr>)}</tbody></table></div>
+      <section className="shared-bottom"><div>{quote.note && <><small>TEKLİF NOTU</small><p>{quote.note}</p></>}</div><div className="paper-totals"><p><span>Ara toplam</span><b>{money(totals.subtotal, quote.currency ?? "TRY")}</b></p><p><span>İndirim</span><b>− {money(totals.discount, quote.currency ?? "TRY")}</b></p><p><span>KDV</span><b>{money(totals.vat, quote.currency ?? "TRY")}</b></p><p className="paper-grand"><span>Genel toplam</span><b>{money(totals.total, quote.currency ?? "TRY")}</b></p></div></section>
       <footer>Bu teklif {new Date(quote.validUntil).toLocaleDateString("tr-TR")} tarihine kadar geçerlidir. Nihai kabul ve ticari koşullar teklifi hazırlayan işletmenin sorumluluğundadır.</footer>
     </article>
   </main>;

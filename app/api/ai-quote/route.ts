@@ -1,18 +1,6 @@
 import { deterministicQuoteAi, type AiCustomer, type AiProduct } from "@/lib/ai-quote-parser";
 import type { AiQuoteApiResponse } from "@/lib/ai-quote-contract";
-import { consumeRateLimit, requestRateLimitKey } from "@/lib/rate-limit";
-
-type FirestoreValue = {
-  stringValue?: string;
-  integerValue?: string;
-  doubleValue?: number;
-  booleanValue?: boolean;
-  nullValue?: null;
-};
-
-type FirestoreDocument = {
-  fields?: Record<string, FirestoreValue>;
-};
+import { consumeDistributedRateLimit, firestoreField as field, getFirebaseServerContext, type FirestoreDocument } from "@/lib/firebase/server-rest";
 
 const emptyResponse = (): AiQuoteApiResponse => ({
   customerMatch: null,
@@ -26,46 +14,6 @@ const emptyResponse = (): AiQuoteApiResponse => ({
 const json = (body: AiQuoteApiResponse, status = 200, mode = "mock") =>
   Response.json(body, { status, headers: { "X-AI-Mode": mode } });
 
-const field = (document: FirestoreDocument, name: string) => {
-  const value = document.fields?.[name];
-  if (!value) return undefined;
-  if (value.stringValue !== undefined) return value.stringValue;
-  if (value.integerValue !== undefined) return Number(value.integerValue);
-  if (value.doubleValue !== undefined) return value.doubleValue;
-  if (value.booleanValue !== undefined) return value.booleanValue;
-  return undefined;
-};
-
-async function getFirebaseContext(idToken: string) {
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  if (!apiKey || !projectId) throw new Error("Firebase yapılandırılmadı.");
-
-  const identityResponse = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-      cache: "no-store",
-    },
-  );
-  const identity = (await identityResponse.json()) as { users?: Array<{ localId?: string }> };
-  const uid = identity.users?.[0]?.localId;
-  if (!identityResponse.ok || !uid) throw new Error("Geçersiz Firebase oturumu.");
-
-  const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents`;
-  const userResponse = await fetch(`${base}/users/${encodeURIComponent(uid)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-    cache: "no-store",
-  });
-  if (!userResponse.ok) throw new Error("Çalışma alanı bulunamadı.");
-  const userDocument = (await userResponse.json()) as FirestoreDocument;
-  const organizationId = field(userDocument, "organizationId");
-  if (typeof organizationId !== "string" || !organizationId)
-    throw new Error("Çalışma alanı bulunamadı.");
-  return { base, projectId, uid, organizationId };
-}
 async function getOrganizationCatalog(
   idToken: string,
   projectId: string,
@@ -234,27 +182,6 @@ export async function POST(request: Request) {
     else console.log(entry);
     return json(body, status, mode);
   };
-  const rateLimit = consumeRateLimit(await requestRateLimitKey(request, "ai-quote"), {
-    limit: 12,
-    windowMs: 60_000,
-  });
-  if (!rateLimit.allowed) {
-    console.warn(JSON.stringify({
-      level: "warn",
-      message: "ai_quote_rate_limited",
-      route: "/api/ai-quote",
-      requestId,
-      status: 429,
-      durationMs: Date.now() - startedAt,
-    }));
-    return Response.json(emptyResponse(), {
-      status: 429,
-      headers: {
-        "Retry-After": String(rateLimit.retryAfterSeconds),
-        "X-AI-Mode": "none",
-      },
-    });
-  }
   const authorization = request.headers.get("authorization");
   const idToken = authorization?.startsWith("Bearer ")
     ? authorization.slice("Bearer ".length)
@@ -271,7 +198,9 @@ export async function POST(request: Request) {
   if (!prompt) return respond(emptyResponse(), 400, "none", "empty_prompt");
 
   try {
-    const context = await getFirebaseContext(idToken);
+    const context = await getFirebaseServerContext(idToken);
+    const rateLimit = await consumeDistributedRateLimit({ ...context, idToken, scope: "ai-quote", limit: 12, windowMs: 60_000 });
+    if (!rateLimit.allowed) return Response.json(emptyResponse(), { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds), "X-AI-Mode": "none" } });
     const [customerDocs, productDocs] = await Promise.all([
       getOrganizationCatalog(idToken, context.projectId, context.organizationId, "customers"),
       getOrganizationCatalog(idToken, context.projectId, context.organizationId, "products"),

@@ -21,6 +21,25 @@ The report intentionally contains only:
 
 Do not add names, email addresses, customer data, quote content, prompts, authentication tokens, stacks, or raw exception messages to production logs. Review errors in Vercel → Project → Logs and filter for `client_error`.
 
+The client-error endpoint requires a valid Firebase ID token and uses a Firestore-backed per-user rate-limit bucket. The AI endpoint uses the same distributed design. Rate-limit documents contain only UID, organization ID, scope, counters, and timestamps; they never contain bearer tokens, prompts, customer names, emails, or quote content.
+
+## Closed registration operations
+
+Public UI signup is disabled in production, and Firestore independently blocks arbitrary authenticated users from creating an organization or owner profile. Before an approved new organization registers, an administrator must create this document with trusted Firebase Console/Admin SDK access:
+
+```text
+registrationAuthorizations/{lowercase-email}
+  email: lowercase-email
+  active: true
+  expiresAt: future Firestore timestamp
+```
+
+Client access to this collection is denied. The authorization is evaluated only inside Firestore Security Rules. Team invitation acceptance remains separate, email-bound, role-bound, and expiring. Remove or deactivate unused authorization records through trusted administration.
+
+## Legal readiness
+
+Before real-customer data or paid commercial use, complete the checklist in `docs/LEGAL-READINESS.md`. The repository's legal pages are professional drafts, not compliance certification or legal advice.
+
 ## Deployment check
 
 1. Confirm GitHub `Quality checks` is green.

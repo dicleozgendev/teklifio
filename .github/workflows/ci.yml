@@ -39,6 +39,9 @@ jobs:
       - name: Run unit and security tests
         run: npm run test:unit
 
+      - name: Run Firestore rules bypass tests
+        run: npx firebase-tools@15.11.0 emulators:exec --only firestore --project demo-teklifio-security "node --test tests/firestore-rules.emulator.mjs"
+
       - name: Run browser tests
         run: npm run test:e2e
 

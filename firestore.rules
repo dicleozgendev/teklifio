@@ -32,6 +32,13 @@ service cloud.firestore {
       return ownsExistingDocument() && currentRole() != 'viewer';
     }
 
+    function isMinimalShare(data) {
+      return data.keys().hasOnly(['token', 'quoteId', 'organizationId', 'active', 'expiresAt', 'quote', 'customer', 'settings', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.quote.keys().hasOnly(['id', 'date', 'validUntil', 'items', 'note', 'currency'])
+        && data.customer.keys().hasOnly(['company', 'name'])
+        && data.settings.keys().hasOnly(['companyName', 'address', 'email']);
+    }
+
     function validRole(role) {
       return role in ['owner', 'admin', 'member', 'viewer'];
     }
@@ -40,9 +47,25 @@ service cloud.firestore {
     function isOwner() { return hasWorkspace() && currentRole() == 'owner'; }
     function isManager() { return hasWorkspace() && currentRole() in ['owner', 'admin']; }
 
+    function hasRegistrationAuthorization() {
+      return signedIn()
+        && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/registrationAuthorizations/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/registrationAuthorizations/$(request.auth.token.email)).data.email == request.auth.token.email
+        && get(/databases/$(database)/documents/registrationAuthorizations/$(request.auth.token.email)).data.active == true
+        && request.time < get(/databases/$(database)/documents/registrationAuthorizations/$(request.auth.token.email)).data.expiresAt;
+    }
+
+    match /registrationAuthorizations/{email} {
+      allow read, write: if false;
+    }
+
     match /organizations/{orgId} {
       allow create: if signedIn()
-        && request.resource.data.ownerId == request.auth.uid;
+        && hasRegistrationAuthorization()
+        && orgId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.registrationEmail == request.auth.token.email;
       allow read: if hasWorkspace() && orgId == organizationId();
       allow update: if isManager()
         && orgId == organizationId()
@@ -59,6 +82,8 @@ service cloud.firestore {
         && request.resource.data.emailVerificationRequired == true
         && request.resource.data.status == 'active'
         && ((request.resource.data.role == 'owner'
+          && hasRegistrationAuthorization()
+          && request.resource.data.email == request.auth.token.email
           && getAfter(/databases/$(database)/documents/organizations/$(request.resource.data.organizationId)).data.ownerId == request.auth.uid)
         || (request.resource.data.role in ['admin', 'member', 'viewer']
           && request.resource.data.inviteId is string
@@ -119,7 +144,7 @@ service cloud.firestore {
           && request.resource.data.email == resource.data.email
           && request.resource.data.role == resource.data.role
           && request.resource.data.expiresAt == resource.data.expiresAt
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'updatedAt'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedBy', 'acceptedAt', 'updatedAt'])
           && request.time < resource.data.expiresAt);
       allow delete: if false;
     }
@@ -170,11 +195,14 @@ service cloud.firestore {
     }
 
     match /quoteShares/{token} {
-      allow get: if resource.data.active == true && request.time < resource.data.expiresAt;
+      allow get: if resource.data.active == true
+        && request.time < resource.data.expiresAt
+        && isMinimalShare(resource.data);
       allow list: if hasWorkspace() && resource.data.organizationId == organizationId();
       allow create: if writesOwnOrganization()
         && request.resource.data.token == token
         && token.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+        && isMinimalShare(request.resource.data)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.active == true
         && request.resource.data.expiresAt > request.time
@@ -188,6 +216,32 @@ service cloud.firestore {
         && request.resource.data.active == false
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt']);
       allow delete: if false;
+    }
+
+    match /apiRateLimits/{bucketId} {
+      allow get: if hasWorkspace()
+        && bucketId.matches('^' + request.auth.uid + '_(ai-quote|client-error)_[0-9]+$');
+      allow list, delete: if false;
+      allow create: if hasWorkspace()
+        && bucketId.matches('^' + request.auth.uid + '_(ai-quote|client-error)_[0-9]+$')
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.organizationId == organizationId()
+        && request.resource.data.scope in ['ai-quote', 'client-error']
+        && request.resource.data.count == 1
+        && request.resource.data.windowStart <= request.time
+        && request.time < request.resource.data.windowStart + duration.value(60, 's')
+        && request.resource.data.expiresAt == request.resource.data.windowStart + duration.value(120, 's');
+      allow update: if hasWorkspace()
+        && resource.data.uid == request.auth.uid
+        && resource.data.organizationId == organizationId()
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.scope == resource.data.scope
+        && request.resource.data.windowStart == resource.data.windowStart
+        && request.resource.data.expiresAt == resource.data.expiresAt
+        && request.resource.data.count == resource.data.count + 1
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.time < resource.data.windowStart + duration.value(60, 's');
     }
 
     match /deletionRequests/{orgId} {

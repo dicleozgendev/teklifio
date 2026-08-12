@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { getFirebaseServices } from "@/lib/firebase/client";
 
 type State = { failed: boolean };
 
@@ -18,16 +19,16 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
       const safeEntry = { at: new Date().toISOString(), path: window.location.pathname, message: error.name || "ApplicationError" };
       sessionStorage.setItem(key, JSON.stringify([...current.slice(-19), safeEntry]));
     } catch { /* Kurtarma ekranı loglamadan da çalışır. */ }
-    void fetch("/api/client-error", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: error.name || "ApplicationError",
-        path: window.location.pathname,
-        digest: error.digest,
-      }),
-      keepalive: true,
-    }).catch(() => undefined);
+    void (async () => {
+      const idToken = await getFirebaseServices()?.auth.currentUser?.getIdToken().catch(() => undefined);
+      if (!idToken) return;
+      await fetch("/api/client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ type: error.name || "ApplicationError", path: window.location.pathname, digest: error.digest }),
+        keepalive: true,
+      });
+    })().catch(() => undefined);
   }
 
   render() {
