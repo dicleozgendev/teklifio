@@ -8,15 +8,27 @@ AI-powered B2B quote generation and lightweight CRM platform for creating, manag
 
 ## Screenshots
 
-Project screenshots can be added before a marketing launch:
+All screenshots below use fictional demo records and financial values.
 
-| Dashboard | Quote builder |
-| --- | --- |
-| _Screenshot placeholder_ | _Screenshot placeholder_ |
+### Dashboard
 
-| AI quote preview | PDF quote |
+![Teklifio dashboard with sales overview and recent quotes](docs/screenshots/01-dashboard.png)
+
+### CRM and catalog
+
+| Customer management | Product and service catalog |
 | --- | --- |
-| _Screenshot placeholder_ | _Screenshot placeholder_ |
+| ![Customer management](docs/screenshots/02-customers.png) | ![Product and service catalog](docs/screenshots/03-products-services.png) |
+
+### Quote workflow
+
+| Manual quote builder | AI-assisted draft with human review |
+| --- | --- |
+| ![Manual quote builder](docs/screenshots/04-manual-quote.png) | ![AI quote preview](docs/screenshots/05-ai-quote-preview.png) |
+
+| Quote detail and PDF action | Workspace branding settings |
+| --- | --- |
+| ![Quote detail](docs/screenshots/06-quote-detail.png) | ![Workspace branding settings](docs/screenshots/07-workspace-branding.png) |
 
 ## Overview
 
